@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "VerseTale",
+    "slug": "versetale",
+    "version": "1.0.0",
+    "scheme": "versetale",
+    "orientation": "portrait",
+    "icon": "./logo.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0F1E"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.versetale.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0F1E"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.versetale.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/AmiriQuran.ttf"
+          ]
+        }
+      ],
+      "expo-web-browser",
+      "expo-dev-client"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b106d9f7-f41d-4014-9aa0-2a48d6111a5c"
+      }
+    },
+    "owner": "snymnd"
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "id": "yusuf-resilience",
+  "title": "The Resilience of Yusuf",
+  "titleArabic": "قصة يوسف",
+  "description": "A 7-day journey through Surah Yusuf — patience, betrayal, and the triumph of trust in God.",
+  "coverGradient": ["#1E3A5F", "#0D7377"],
+  "totalQuests": 7,
+  "difficulty": "beginner",
+  "tags": ["patience", "trust", "family", "prophets"],
+  "quests": [
+    {
+      "id": "quest-1",
+      "day": 1,
+      "title": "The Dream",
+      "titleArabic": "الرؤيا",
+      "narrative": "Yusuf shares a mysterious dream with his father — eleven stars, the sun, and the moon bow before him. Yaqub recognises its weight and warns his son to keep it secret.",
+      "verseKeys": ["12:4", "12:5", "12:6"],
+      "reflection": "What do we do when we sense greatness stirring within us? Yaqub's wisdom: guard the gift before it is ready to meet the world.",
+      "completionPrompt": "Which emotion resonates with you most in these verses — wonder, fear, or hope?"
+    },
+    {
+      "id": "quest-2",
+      "day": 2,
+      "title": "The Pit",
+      "titleArabic": "البئر",
+      "narrative": "Jealousy ripens into action. His brothers throw Yusuf into the depths of a well, then return home with a bloodied shirt and a fabricated grief.",
+      "verseKeys": ["12:9", "12:10", "12:15", "12:18"],
+      "reflection": "Betrayal by those closest to us is among life's sharpest wounds. Yet even in the pit, God does not abandon His servant.",
+      "completionPrompt": "Have you ever found a moment of calm in what felt like rock bottom?"
+    },
+    {
+      "id": "quest-3",
+      "day": 3,
+      "title": "The Caravan",
+      "titleArabic": "القافلة",
+      "narrative": "A caravan passing by draws water and finds a boy instead. Yusuf is sold into Egypt for a handful of coins — merchandise exchanged at the crossroads of destiny.",
+      "verseKeys": ["12:19", "12:20", "12:21"],
+      "reflection": "God allowed Yusuf to be sold so He could place him exactly where he needed to be. Sometimes the worst transactions become divine positioning.",
+      "completionPrompt": "Reflect on a 'low price' moment in your life that later revealed greater purpose."
+    },
+    {
+      "id": "quest-4",
+      "day": 4,
+      "title": "The Palace Trial",
+      "titleArabic": "محنة القصر",
+      "narrative": "In Potiphar's household Yusuf rises — and is tested. The nobleman's wife pursues him; he flees to the door. Slander follows, and he is imprisoned despite his innocence.",
+      "verseKeys": ["12:23", "12:24", "12:25", "12:26", "12:33"],
+      "reflection": "Yusuf's prayer in verse 33 is extraordinary: he does not ask for the woman to be stopped — he asks God to save him from his own potential weakness. True character is knowing where your vulnerabilities lie.",
+      "completionPrompt": "What is the difference between fleeing temptation and trusting God to guard you within it?"
+    },
+    {
+      "id": "quest-5",
+      "day": 5,
+      "title": "The Prison",
+      "titleArabic": "السجن",
+      "narrative": "Behind bars Yusuf becomes a counsellor. He interprets dreams for two companions and plants a seed of appeal in the one who will be freed — only to be forgotten for years.",
+      "verseKeys": ["12:36", "12:37", "12:38", "12:41", "12:42"],
+      "reflection": "Doing good for others — even when you are yourself in chains — is among the greatest spiritual disciplines. Yusuf did not wait for freedom to be generous.",
+      "completionPrompt": "How do you maintain hope and purpose when you are waiting for someone else to act on your behalf?"
+    },
+    {
+      "id": "quest-6",
+      "day": 6,
+      "title": "The King's Dream",
+      "titleArabic": "رؤيا الملك",
+      "narrative": "The king dreams of seven fat cows devoured by seven lean ones. Only Yusuf can interpret it. In one sentence he turns prison walls into a ministry of economics — and a gate opens.",
+      "verseKeys": ["12:43", "12:44", "12:46", "12:47", "12:54", "12:55"],
+      "reflection": "Years of waiting compressed into a single morning. When God moves, He moves completely. Yusuf did not waste the prison years; they became the credential that freed him.",
+      "completionPrompt": "What skills or wisdom are you developing in your current waiting season?"
+    },
+    {
+      "id": "quest-7",
+      "day": 7,
+      "title": "Reunion",
+      "titleArabic": "اللقاء",
+      "narrative": "Famine drives his brothers to Egypt. They stand before the governor not knowing it is Yusuf. He reveals himself — not with revenge but with grace. 'No blame on you today. God will forgive you.'",
+      "verseKeys": ["12:87", "12:92", "12:100", "12:101"],
+      "reflection": "The dream from Day 1 is fulfilled in Day 7. The stars bow, the circle closes. Yusuf's final words are not triumph but gratitude. The journey was never about Yusuf ascending — it was about God's faithfulness.",
+      "completionPrompt": "What would it mean to reach your highest point and respond with gratitude rather than vindication?"
+    }
+  ]
+}

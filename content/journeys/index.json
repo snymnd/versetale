@@ -1,0 +1,14 @@
+{
+  "journeys": [
+    {
+      "id": "yusuf-resilience",
+      "title": "The Resilience of Yusuf",
+      "titleArabic": "قصة يوسف",
+      "description": "A 7-day journey through Surah Yusuf — patience, betrayal, and the triumph of trust in God.",
+      "coverGradient": ["#1E3A5F", "#0D7377"],
+      "totalQuests": 7,
+      "difficulty": "beginner",
+      "tags": ["patience", "trust", "family", "prophets"]
+    }
+  ]
+}

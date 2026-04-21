@@ -3,28 +3,36 @@ import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useRef } from 'react';
 
-import { AUTH_CLIENT_ID, AUTH_DISCOVERY } from '@/lib/constants';
+import { getQfOAuthConfig } from '@/lib/qfOAuthConfig';
 import { useAuthStore } from './authStore';
 
 // Required to complete the auth session on Android
 WebBrowser.maybeCompleteAuthSession();
 
+const SCOPES = ['openid', 'profile', 'email', 'offline_access'];
+
 // Must exactly match the redirect URI registered with Quran Foundation for this client ID.
 // PRD specifies versetale://auth/callback — ensure QF has this registered.
 const REDIRECT_URI = AuthSession.makeRedirectUri({ native: 'versetale://auth/callback' });
 
-const SCOPES = ['openid', 'profile', 'email', 'offline_access'];
-
 export function useAuth() {
   const { user, accessToken, isAuthenticated, isLoading, logout, restoreSession } = useAuthStore();
-  const _setTokens = useAuthStore((s) => s._setTokens);
+  const _setSession = useAuthStore((s) => s._setSession);
+
+  const config = getQfOAuthConfig();
+
+  const discovery: AuthSession.DiscoveryDocument = {
+    authorizationEndpoint: `${config.authBaseUrl}/oauth2/auth`,
+    tokenEndpoint: `${config.authBaseUrl}/oauth2/token`,
+    revocationEndpoint: `${config.authBaseUrl}/oauth2/revoke`,
+  };
 
   // Nonce is required when using openid scope (per QF OIDC docs)
   const nonceRef = useRef<string>(Crypto.randomUUID());
 
   const [_request, _response, promptAsync] = AuthSession.useAuthRequest(
     {
-      clientId: AUTH_CLIENT_ID,
+      clientId: config.clientId,
       redirectUri: REDIRECT_URI,
       scopes: SCOPES,
       usePKCE: true,
@@ -33,12 +41,14 @@ export function useAuth() {
         nonce: nonceRef.current,
       },
     },
-    AUTH_DISCOVERY,
+    discovery,
   );
 
   const login = useCallback(async () => {
-    // Fresh nonce for each login attempt
     nonceRef.current = Crypto.randomUUID();
+
+    // Capture state before promptAsync for CSRF validation
+    const expectedState = _request?.state;
 
     const result = await promptAsync();
 
@@ -47,32 +57,39 @@ export function useAuth() {
     }
 
     const { code, state } = result.params;
+
+    // CSRF: validate state matches what we sent
+    if (expectedState && state !== expectedState) {
+      return;
+    }
+
     if (!code) {
       return;
     }
 
-    // Exchange auth code for tokens.
-    // This requires the client to be configured as public (token_endpoint_auth_method=none)
-    // by Quran Foundation. Contact developers@quran.com to confirm or request this.
-    const tokenResponse = await AuthSession.exchangeCodeAsync(
-      {
-        clientId: AUTH_CLIENT_ID,
-        redirectUri: REDIRECT_URI,
-        code,
-        extraParams: {
-          code_verifier: _request?.codeVerifier ?? '',
+    let tokenResponse: AuthSession.TokenResponse;
+    try {
+      tokenResponse = await AuthSession.exchangeCodeAsync(
+        {
+          clientId: config.clientId,
+          redirectUri: REDIRECT_URI,
+          code,
+          extraParams: {
+            code_verifier: _request?.codeVerifier ?? '',
+          },
         },
-      },
-      AUTH_DISCOVERY,
-    );
+        discovery,
+      );
+    } catch {
+      throw new Error('Failed to exchange authorization code for tokens');
+    }
 
-    const { accessToken: token, idToken } = tokenResponse;
+    const { accessToken: token, refreshToken, idToken, expiresIn } = tokenResponse;
 
     if (!token) {
       return;
     }
 
-    // Parse the id_token JWT payload to extract user info
     let userInfo = { sub: state ?? 'unknown', name: 'VerseTale User', email: '' };
 
     if (idToken) {
@@ -88,7 +105,6 @@ export function useAuth() {
 
           // Validate nonce to prevent replay attacks
           if (decoded.nonce && decoded.nonce !== nonceRef.current) {
-            console.error('[Auth] Nonce mismatch — possible replay attack');
             return;
           }
 
@@ -103,8 +119,14 @@ export function useAuth() {
       }
     }
 
-    await _setTokens(token, userInfo);
-  }, [promptAsync, _request, _setTokens]);
+    await _setSession({
+      accessToken: token,
+      refreshToken: refreshToken ?? undefined,
+      idToken: idToken ?? undefined,
+      expiresIn: expiresIn ?? undefined,
+      user: userInfo,
+    });
+  }, [promptAsync, _request, _setSession, config.clientId, config.authBaseUrl]);
 
   return {
     user,

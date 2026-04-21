@@ -42,7 +42,8 @@
         }
       ],
       "expo-web-browser",
-      "expo-dev-client"
+      "expo-dev-client",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

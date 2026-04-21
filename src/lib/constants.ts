@@ -1,13 +1,3 @@
-// OAuth / API constants — values come from the .env file loaded at build time
-export const AUTH_CLIENT_ID = 'f8c3932c-74ad-4628-b223-9679142f86e1';
-export const AUTH_ENDPOINT = 'https://prelive-oauth2.quran.foundation';
-
-export const AUTH_DISCOVERY = {
-  authorizationEndpoint: `${AUTH_ENDPOINT}/oauth2/auth`,
-  tokenEndpoint: `${AUTH_ENDPOINT}/oauth2/token`,
-  revocationEndpoint: `${AUTH_ENDPOINT}/oauth2/revoke`,
-};
-
 // SecureStore keys
 export const SECURE_STORE_KEYS = {
   ACCESS_TOKEN: 'versetale_access_token',
@@ -22,7 +12,7 @@ export const STALE_TIMES = {
   USER_DATA: 5 * 60 * 1000, // 5 minutes
 } as const;
 
-// Design tokens (mirror tailwind config for use in StyleSheet)
+// Design tokens
 export const COLORS = {
   BG_DEEP: '#0A0F1E',
   BG_SURFACE: '#111827',

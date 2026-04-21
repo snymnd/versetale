@@ -9,13 +9,23 @@ interface User {
   email: string;
 }
 
+interface SessionParams {
+  accessToken: string;
+  refreshToken?: string;
+  idToken?: string;
+  expiresIn?: number;
+  user: User;
+}
+
 export interface AuthState {
   user: User | null;
   accessToken: string | null;
+  refreshToken: string | null;
+  idToken: string | null;
+  expiresAt: number | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  // Actions (login/logout are implemented in useAuth.ts which drives the OAuth flow)
-  _setTokens: (accessToken: string, user: User) => Promise<void>;
+  _setSession: (params: SessionParams) => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
 }
@@ -23,40 +33,81 @@ export interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   accessToken: null,
+  refreshToken: null,
+  idToken: null,
+  expiresAt: null,
   isAuthenticated: false,
   isLoading: true,
 
-  _setTokens: async (accessToken, user) => {
-    await SecureStore.setItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN, accessToken);
-    await SecureStore.setItemAsync(SECURE_STORE_KEYS.USER, JSON.stringify(user));
-    set({ accessToken, user, isAuthenticated: true, isLoading: false });
+  _setSession: async ({ accessToken, refreshToken, idToken, expiresIn, user }) => {
+    const expiresAt = expiresIn ? Date.now() + expiresIn * 1000 : null;
+
+    await Promise.all([
+      SecureStore.setItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN, accessToken),
+      SecureStore.setItemAsync(SECURE_STORE_KEYS.USER, JSON.stringify(user)),
+      refreshToken
+        ? SecureStore.setItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN, refreshToken)
+        : Promise.resolve(),
+      idToken
+        ? SecureStore.setItemAsync(SECURE_STORE_KEYS.ID_TOKEN, idToken)
+        : Promise.resolve(),
+    ]);
+
+    set({
+      accessToken,
+      refreshToken: refreshToken ?? null,
+      idToken: idToken ?? null,
+      expiresAt,
+      user,
+      isAuthenticated: true,
+      isLoading: false,
+    });
   },
 
   logout: async () => {
-    await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN);
-    await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN);
-    await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ID_TOKEN);
-    await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.USER);
-    set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
+    await Promise.all([
+      SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN),
+      SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN),
+      SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ID_TOKEN),
+      SecureStore.deleteItemAsync(SECURE_STORE_KEYS.USER),
+    ]);
+    set({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      idToken: null,
+      expiresAt: null,
+      isAuthenticated: false,
+      isLoading: false,
+    });
   },
 
   restoreSession: async () => {
     try {
       set({ isLoading: true });
-      const [accessToken, userJson] = await Promise.all([
+      const [accessToken, refreshToken, idToken, userJson] = await Promise.all([
         SecureStore.getItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN),
+        SecureStore.getItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN),
+        SecureStore.getItemAsync(SECURE_STORE_KEYS.ID_TOKEN),
         SecureStore.getItemAsync(SECURE_STORE_KEYS.USER),
       ]);
 
       if (accessToken && userJson) {
         const user = JSON.parse(userJson) as User;
-        set({ accessToken, user, isAuthenticated: true, isLoading: false });
+        set({
+          accessToken,
+          refreshToken: refreshToken ?? null,
+          idToken: idToken ?? null,
+          expiresAt: null,
+          user,
+          isAuthenticated: true,
+          isLoading: false,
+        });
       } else {
         set({ isLoading: false });
       }
     } catch {
-      // Corrupted storage — clear everything and start fresh
-      set({ user: null, accessToken: null, isAuthenticated: false, isLoading: false });
+      set({ user: null, accessToken: null, refreshToken: null, idToken: null, expiresAt: null, isAuthenticated: false, isLoading: false });
     }
   },
 }));

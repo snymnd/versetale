@@ -1,81 +1,121 @@
+// expo-av is used for native audio. To migrate to expo-audio (the new API),
+// rebuild the dev client after running: npx expo run:android / npx expo run:ios
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
+  useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
 
-import { COLORS } from '@/lib/constants';
 import { useQuestProgressStore } from '@/features/journeys/journeyStore';
+import { COLORS } from '@/lib/constants';
 
 interface MiniAudioPlayerProps {
   /**
    * Ordered list of verse keys for the current quest, e.g. ["12:4","12:5","12:6"].
-   * The player uses this to advance to the next verse automatically.
    */
   verseKeys: string[];
   /**
    * Map of verseKey → audioUrl. If a key is absent or null the player skips silently.
    */
   audioMap: Record<string, string | null>;
-  /** Human-readable reciter name for display */
   reciterName?: string;
-  /** Called when audio naturally reaches the last verse and finishes */
   onComplete?: () => void;
-  /** Override the outermost container style (e.g. to remove absolute positioning) */
   containerStyle?: object;
 }
 
-/**
- * MiniAudioPlayer — floating bar pinned above the bottom tab bar.
- *
- * Responsibilities:
- * - Play / pause expo-av Audio.Sound for the currentVerseKey
- * - Auto-advance to the next verse on playback end
- * - Sync play state to questProgressStore
- * - Animate in/out when a verse is active
- */
-export function MiniAudioPlayer({
+interface AudioControlsProps {
+  isLoading: boolean;
+  isPlaying: boolean;
+  canPrev: boolean;
+  canNext: boolean;
+  currentVerseKey: string | null;
+  reciterName: string;
+  onPlayPause: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}
+
+function AudioControls({
+  isLoading,
+  isPlaying,
+  canPrev,
+  canNext,
+  currentVerseKey,
+  reciterName,
+  onPlayPause,
+  onPrev,
+  onNext,
+}: AudioControlsProps) {
+  return (
+    <View style={styles.inner}>
+      <View style={styles.info}>
+        <Text style={styles.reciterName} numberOfLines={1}>
+          {reciterName}
+        </Text>
+        <Text style={styles.verseKey} numberOfLines={1}>
+          {currentVerseKey ?? '—'}
+        </Text>
+      </View>
+
+      <View style={styles.controls}>
+        <Pressable
+          onPress={onPrev}
+          disabled={!canPrev}
+          accessibilityLabel="Previous verse"
+          style={({ pressed }) => [styles.controlBtn, pressed && styles.controlBtnPressed]}
+        >
+          <Text style={[styles.controlIcon, !canPrev && styles.controlDisabled]}>{'«'}</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={onPlayPause}
+          accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+          style={({ pressed }) => [styles.playBtn, pressed && styles.playBtnPressed]}
+        >
+          <Text style={styles.playIcon}>{isLoading ? '…' : isPlaying ? '⏸' : '▶'}</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={onNext}
+          disabled={!canNext}
+          accessibilityLabel="Next verse"
+          style={({ pressed }) => [styles.controlBtn, pressed && styles.controlBtnPressed]}
+        >
+          <Text style={[styles.controlIcon, !canNext && styles.controlDisabled]}>{'»'}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ─── Native path ────────────────────────────────────────────────────────────
+
+interface BarProps extends MiniAudioPlayerProps {
+  currentVerseKey: string | null;
+  isPlaying: boolean;
+  setCurrentVerse: (key: string) => void;
+  setPlaying: (v: boolean) => void;
+}
+
+function NativeAudioBar({
+  currentVerseKey,
+  isPlaying,
+  setCurrentVerse,
+  setPlaying,
   verseKeys,
   audioMap,
   reciterName = 'Mishary Rashid',
   onComplete,
-  containerStyle,
-}: MiniAudioPlayerProps) {
-  const currentVerseKey = useQuestProgressStore((s) => s.currentVerseKey);
-  const isPlaying = useQuestProgressStore((s) => s.isPlaying);
-  const setCurrentVerse = useQuestProgressStore((s) => s.setCurrentVerse);
-  const setPlaying = useQuestProgressStore((s) => s.setPlaying);
-
+}: BarProps) {
   const soundRef = useRef<Audio.Sound | null>(null);
-  // Web-only: native HTMLAudioElement for reliable browser playback
-  const webAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const translateY = useSharedValue(80);
-  const visible = currentVerseKey !== null;
-
   useEffect(() => {
-    translateY.value = withSpring(visible ? 0 : 80, { damping: 18, stiffness: 200 });
-  }, [visible, translateY]);
-
-  useEffect(() => {
-    if (Platform.OS !== 'web') {
-      Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-      }).catch(() => {});
-    }
-    return () => {
-      soundRef.current?.unloadAsync().catch(() => {});
-      if (webAudioRef.current) {
-        webAudioRef.current.pause();
-        webAudioRef.current = null;
-      }
-    };
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false, shouldDuckAndroid: true }).catch(() => {});
+    return () => { soundRef.current?.unloadAsync().catch(() => {}); };
   }, []);
 
   const loadAndPlay = useCallback(
@@ -85,46 +125,27 @@ export function MiniAudioPlayer({
 
       setIsLoading(true);
       try {
-        if (Platform.OS === 'web') {
-          // Use native HTMLAudioElement — avoids expo-av web limitations
-          if (webAudioRef.current) {
-            webAudioRef.current.pause();
-            webAudioRef.current.src = '';
-          }
-          const audio = new window.Audio(url);
-          webAudioRef.current = audio;
-          audio.onended = () => {
-            const idx = verseKeys.indexOf(verseKey);
-            const nextKey = verseKeys[idx + 1];
-            if (nextKey) { setCurrentVerse(nextKey); }
-            else { setPlaying(false); onComplete?.(); }
-          };
-          await audio.play();
-          setPlaying(true);
-        } else {
-          if (soundRef.current) {
-            await soundRef.current.unloadAsync();
-            soundRef.current = null;
-          }
-          const { sound } = await Audio.Sound.createAsync(
-            { uri: url },
-            { shouldPlay: true },
-            (status: AVPlaybackStatus) => {
-              if (!status.isLoaded) return;
-              if (status.didJustFinish) {
-                const idx = verseKeys.indexOf(verseKey);
-                const nextKey = verseKeys[idx + 1];
-                if (nextKey) { setCurrentVerse(nextKey); }
-                else { setPlaying(false); onComplete?.(); }
-              }
-              setPlaying(status.isPlaying);
-            },
-          );
-          soundRef.current = sound;
-          setPlaying(true);
+        if (soundRef.current) {
+          await soundRef.current.unloadAsync();
+          soundRef.current = null;
         }
-      } catch (err) {
-        console.error('[MiniAudioPlayer] playback error:', err);
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: url },
+          { shouldPlay: true },
+          (status: AVPlaybackStatus) => {
+            if (!status.isLoaded) return;
+            if (status.didJustFinish) {
+              const idx = verseKeys.indexOf(verseKey);
+              const nextKey = verseKeys[idx + 1];
+              if (nextKey) { setCurrentVerse(nextKey); }
+              else { setPlaying(false); onComplete?.(); }
+            }
+            setPlaying(status.isPlaying);
+          },
+        );
+        soundRef.current = sound;
+        setPlaying(true);
+      } catch {
         setPlaying(false);
       } finally {
         setIsLoading(false);
@@ -139,19 +160,6 @@ export function MiniAudioPlayer({
   }, [currentVerseKey]);
 
   const handlePlayPause = useCallback(async () => {
-    if (Platform.OS === 'web') {
-      const audio = webAudioRef.current;
-      if (!audio) {
-        if (currentVerseKey) loadAndPlay(currentVerseKey);
-        return;
-      }
-      try {
-        if (isPlaying) { audio.pause(); setPlaying(false); }
-        else { await audio.play(); setPlaying(true); }
-      } catch { /* ignore */ }
-      return;
-    }
-
     const sound = soundRef.current;
     if (!sound) {
       if (currentVerseKey) loadAndPlay(currentVerseKey);
@@ -165,68 +173,179 @@ export function MiniAudioPlayer({
 
   const handlePrev = useCallback(() => {
     if (!currentVerseKey) return;
-    const idx = verseKeys.indexOf(currentVerseKey);
-    const prevKey = verseKeys[idx - 1];
-    if (prevKey) setCurrentVerse(prevKey);
+    const prev = verseKeys[verseKeys.indexOf(currentVerseKey) - 1];
+    if (prev) setCurrentVerse(prev);
   }, [currentVerseKey, verseKeys, setCurrentVerse]);
 
   const handleNext = useCallback(() => {
     if (!currentVerseKey) return;
-    const idx = verseKeys.indexOf(currentVerseKey);
-    const nextKey = verseKeys[idx + 1];
-    if (nextKey) setCurrentVerse(nextKey);
+    const next = verseKeys[verseKeys.indexOf(currentVerseKey) + 1];
+    if (next) setCurrentVerse(next);
   }, [currentVerseKey, verseKeys, setCurrentVerse]);
+
+  const currentIdx = currentVerseKey ? verseKeys.indexOf(currentVerseKey) : -1;
+
+  return (
+    <AudioControls
+      isLoading={isLoading}
+      isPlaying={isPlaying}
+      canPrev={currentIdx > 0}
+      canNext={currentIdx >= 0 && currentIdx < verseKeys.length - 1}
+      currentVerseKey={currentVerseKey}
+      reciterName={reciterName}
+      onPlayPause={handlePlayPause}
+      onPrev={handlePrev}
+      onNext={handleNext}
+    />
+  );
+}
+
+// ─── Web path ────────────────────────────────────────────────────────────────
+
+function WebAudioBar({
+  currentVerseKey,
+  isPlaying,
+  setCurrentVerse,
+  setPlaying,
+  verseKeys,
+  audioMap,
+  reciterName = 'Mishary Rashid',
+  onComplete,
+}: BarProps) {
+  const webAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadAndPlay = useCallback(
+    async (verseKey: string) => {
+      const url = audioMap[verseKey];
+      if (!url) { setPlaying(false); return; }
+
+      setIsLoading(true);
+      try {
+        if (webAudioRef.current) {
+          webAudioRef.current.pause();
+          webAudioRef.current.src = '';
+        }
+        const audio = new window.Audio(url);
+        webAudioRef.current = audio;
+        audio.onended = () => {
+          const idx = verseKeys.indexOf(verseKey);
+          const nextKey = verseKeys[idx + 1];
+          if (nextKey) { setCurrentVerse(nextKey); }
+          else { setPlaying(false); onComplete?.(); }
+        };
+        await audio.play();
+        setPlaying(true);
+      } catch {
+        setPlaying(false);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [audioMap, verseKeys, setCurrentVerse, setPlaying, onComplete],
+  );
+
+  useEffect(() => {
+    if (currentVerseKey) loadAndPlay(currentVerseKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentVerseKey]);
+
+  useEffect(() => {
+    return () => {
+      if (webAudioRef.current) {
+        webAudioRef.current.pause();
+        webAudioRef.current = null;
+      }
+    };
+  }, []);
+
+  const handlePlayPause = useCallback(async () => {
+    const audio = webAudioRef.current;
+    if (!audio) {
+      if (currentVerseKey) loadAndPlay(currentVerseKey);
+      return;
+    }
+    try {
+      if (isPlaying) { audio.pause(); setPlaying(false); }
+      else { await audio.play(); setPlaying(true); }
+    } catch { /* ignore */ }
+  }, [isPlaying, currentVerseKey, loadAndPlay, setPlaying]);
+
+  const handlePrev = useCallback(() => {
+    if (!currentVerseKey) return;
+    const prev = verseKeys[verseKeys.indexOf(currentVerseKey) - 1];
+    if (prev) setCurrentVerse(prev);
+  }, [currentVerseKey, verseKeys, setCurrentVerse]);
+
+  const handleNext = useCallback(() => {
+    if (!currentVerseKey) return;
+    const next = verseKeys[verseKeys.indexOf(currentVerseKey) + 1];
+    if (next) setCurrentVerse(next);
+  }, [currentVerseKey, verseKeys, setCurrentVerse]);
+
+  const currentIdx = currentVerseKey ? verseKeys.indexOf(currentVerseKey) : -1;
+
+  return (
+    <AudioControls
+      isLoading={isLoading}
+      isPlaying={isPlaying}
+      canPrev={currentIdx > 0}
+      canNext={currentIdx >= 0 && currentIdx < verseKeys.length - 1}
+      currentVerseKey={currentVerseKey}
+      reciterName={reciterName}
+      onPlayPause={handlePlayPause}
+      onPrev={handlePrev}
+      onNext={handleNext}
+    />
+  );
+}
+
+// ─── Main export ─────────────────────────────────────────────────────────────
+
+export function MiniAudioPlayer({
+  verseKeys,
+  audioMap,
+  reciterName = 'Mishary Rashid',
+  onComplete,
+  containerStyle,
+}: MiniAudioPlayerProps) {
+  const currentVerseKey = useQuestProgressStore((s) => s.currentVerseKey);
+  const isPlaying = useQuestProgressStore((s) => s.isPlaying);
+  const setCurrentVerse = useQuestProgressStore((s) => s.setCurrentVerse);
+  const setPlaying = useQuestProgressStore((s) => s.setPlaying);
+
+  const visible = currentVerseKey !== null;
+  const translateY = useSharedValue(80);
+
+  useEffect(() => {
+    translateY.value = withSpring(visible ? 0 : 80, { damping: 18, stiffness: 200 });
+  }, [visible, translateY]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
   }));
 
-  const currentIdx = currentVerseKey ? verseKeys.indexOf(currentVerseKey) : -1;
-  const canPrev = currentIdx > 0;
-  const canNext = currentIdx >= 0 && currentIdx < verseKeys.length - 1;
+  const sharedProps: BarProps = {
+    currentVerseKey,
+    isPlaying,
+    setCurrentVerse,
+    setPlaying,
+    verseKeys,
+    audioMap,
+    reciterName,
+    onComplete,
+  };
 
   return (
-    <Animated.View style={[styles.container, animatedStyle, containerStyle]} pointerEvents={visible ? 'auto' : 'none'}>
-      <View style={styles.inner}>
-        {/* Left: reciter + verse info */}
-        <View style={styles.info}>
-          <Text style={styles.reciterName} numberOfLines={1}>
-            {reciterName}
-          </Text>
-          <Text style={styles.verseKey} numberOfLines={1}>
-            {currentVerseKey ?? '—'}
-          </Text>
-        </View>
-
-        {/* Right: controls */}
-        <View style={styles.controls}>
-          <Pressable
-            onPress={handlePrev}
-            disabled={!canPrev}
-            accessibilityLabel="Previous verse"
-            style={({ pressed }) => [styles.controlBtn, pressed && styles.controlBtnPressed]}
-          >
-            <Text style={[styles.controlIcon, !canPrev && styles.controlDisabled]}>{'«'}</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handlePlayPause}
-            accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
-            style={({ pressed }) => [styles.playBtn, pressed && styles.playBtnPressed]}
-          >
-            <Text style={styles.playIcon}>{isLoading ? '…' : isPlaying ? '⏸' : '▶'}</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleNext}
-            disabled={!canNext}
-            accessibilityLabel="Next verse"
-            style={({ pressed }) => [styles.controlBtn, pressed && styles.controlBtnPressed]}
-          >
-            <Text style={[styles.controlIcon, !canNext && styles.controlDisabled]}>{'»'}</Text>
-          </Pressable>
-        </View>
-      </View>
+    <Animated.View
+      style={[styles.container, animatedStyle, containerStyle]}
+      pointerEvents={visible ? 'auto' : 'none'}
+    >
+      {Platform.OS === 'web' ? (
+        <WebAudioBar {...sharedProps} />
+      ) : (
+        <NativeAudioBar {...sharedProps} />
+      )}
     </Animated.View>
   );
 }

@@ -54,6 +54,7 @@ export default function ReaderScreen() {
   const reciterId = useQuestProgressStore((s) => s.reciterId);
   const currentVerseKey = useQuestProgressStore((s) => s.currentVerseKey);
   const setCurrentVerse = useQuestProgressStore((s) => s.setCurrentVerse);
+  const setPlaying = useQuestProgressStore((s) => s.setPlaying);
   const markQuestComplete = useQuestProgressStore((s) => s.markQuestComplete);
 
   const {
@@ -82,6 +83,15 @@ export default function ReaderScreen() {
     setTafsirVerseKey(verse.verseKey);
     setTafsirArabic(verse.textUthmani);
   }, []);
+
+  const handleBack = useCallback(() => {
+    // Reset audio state before leaving so playback stops immediately.
+    // Always replace to journey detail — reader/journey/index are all Tabs.Screen
+    // entries so router.back() skips past journey detail to the tab root.
+    setCurrentVerse(null);
+    setPlaying(false);
+    router.replace(`/(tabs)/journey/${journeyId}`);
+  }, [journeyId, setCurrentVerse, setPlaying]);
 
   const handleQuestComplete = useCallback(() => {
     markQuestComplete(journeyId, questId);
@@ -140,7 +150,7 @@ export default function ReaderScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => handleBack()}
             style={styles.backBtn}
             accessibilityLabel="Go back"
           >
@@ -164,10 +174,27 @@ export default function ReaderScreen() {
         {isLoading ? (
           <View style={styles.centered}>
             <ActivityIndicator color={COLORS.ACCENT} />
+            <Text style={styles.loadingText}>Loading verses…</Text>
           </View>
         ) : isError ? (
           <View style={styles.centered}>
-            <Text style={styles.errorText}>Could not load verses.</Text>
+            <Text style={styles.emptyIcon}>⚠️</Text>
+            <Text style={styles.emptyTitle}>Couldn't load verses</Text>
+            <Text style={styles.errorText}>Check your connection and try again.</Text>
+            <Pressable onPress={() => handleBack()} style={styles.backLink}>
+              <Text style={styles.backLinkText}>← Back to journey</Text>
+            </Pressable>
+          </View>
+        ) : listItems.length === 0 ? (
+          <View style={styles.centered}>
+            <Text style={styles.emptyIcon}>📜</Text>
+            <Text style={styles.emptyTitle}>No verses assigned</Text>
+            <Text style={styles.errorText}>
+              This quest doesn't have any verses yet. Check back soon.
+            </Text>
+            <Pressable onPress={() => handleBack()} style={styles.backLink}>
+              <Text style={styles.backLinkText}>← Back to journey</Text>
+            </Pressable>
           </View>
         ) : (
           <FlashList
@@ -214,10 +241,41 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: COLORS.TEXT_SECONDARY,
+    marginTop: 8,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.TEXT_PRIMARY,
+    textAlign: 'center',
   },
   errorText: {
-    fontSize: 15,
+    fontSize: 14,
     color: COLORS.TEXT_SECONDARY,
+    textAlign: 'center',
+  },
+  backLink: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.CARD_BORDER,
+  },
+  backLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.ACCENT,
   },
   header: {
     flexDirection: 'row',

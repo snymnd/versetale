@@ -52,6 +52,7 @@ export default function RootLayout() {
             <Stack.Screen name="(public)" />
             <Stack.Screen name="onboarding" />
             <Stack.Screen name="reflection/[journeyId]/[questId]" />
+            <Stack.Screen name="auth/callback" />
           </Stack>
         </PersistQueryClientProvider>
       </SafeAreaProvider>

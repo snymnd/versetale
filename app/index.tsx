@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/lib/constants';
+import { useAuthStore } from '@/features/auth/authStore';
 
 /**
  * Public landing page — web-first marketing surface.
@@ -12,6 +13,11 @@ import { COLORS } from '@/lib/constants';
  */
 export default function LandingScreen() {
   const insets = useSafeAreaInsets();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+
+  if (isLoading) return null;
+  if (isAuthenticated) return <Redirect href="/(tabs)" />;
 
   return (
     <ScrollView

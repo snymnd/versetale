@@ -409,3 +409,279 @@ You can check detail availabel API that we can use here
 - [Search API](https://api-docs.quran.foundation/sdk/javascript/search)
 - [Migration Guide](https://api-docs.quran.foundation/sdk/javascript/migration)
 - [Verses API](https://api-docs.quran.foundation/sdk/javascript/verses)
+
+## Auth Setup
+# How to connect the quran.com oauth
+## 1. Implement Quran Foundation OAuth2 client configuration for User APIs.
+
+Goal
+- Make OAuth2 client configuration and environment selection explicit and hard to misuse.
+
+Environment variables (server-only)
+- QF_CLIENT_ID (required)
+- QF_CLIENT_SECRET (required on the backend for current Request Access clients; omit it only if Quran Foundation confirms that your client is public)
+- QF_ENV (optional): "prelive" | "production" (default: "prelive")
+
+Base URLs (copy exactly)
+- Pre-Production:
+  - Auth URL: https://prelive-oauth2.quran.foundation
+  - API Base URL: https://apis-prelive.quran.foundation
+- Production:
+  - Auth URL: https://oauth2.quran.foundation
+  - API Base URL: https://apis.quran.foundation
+
+Implementation requirements
+- Default to a frontend/native app + backend exchange pattern unless Quran Foundation explicitly confirms that the client is public.
+- Make it explicit in code/comments whether this integration is using a public client or a confidential client.
+- Create a config module (e.g., qfOAuthConfig.*) that:
+  - reads QF_CLIENT_ID, QF_CLIENT_SECRET (optional), QF_ENV
+  - maps QF_ENV => { authBaseUrl, apiBaseUrl }
+- Never hardcode or log QF_CLIENT_SECRET.
+- Never print credentials in errors.
+- If QF_CLIENT_ID is missing, throw an error with EXACT message:
+  "Missing Quran Foundation API credentials. Request access: https://api-docs.quran.foundation/request-access"
+
+Output shape
+- Export a function getQfOAuthConfig() that returns:
+  { env, clientId, clientSecret, authBaseUrl, apiBaseUrl }
+
+Acceptance checklist
+- App boots with a clear error when QF_CLIENT_ID is missing.
+- Switching QF_ENV switches both auth and API base URLs together.
+- No logs ever contain client_secret.
+
+## 2. Implement Authorization Code + PKCE authorization URL builder.
+
+Goal
+- Safely redirect users to /oauth2/auth with correct params (state/nonce/PKCE),
+  and safely persist the PKCE verifier for the callback.
+
+Source of truth
+- Authorization endpoint path: /oauth2/auth
+- Required query params:
+  response_type=code
+  client_id
+  redirect_uri
+  scope
+  state
+  nonce (required when requesting openid in many deployments)
+  code_challenge
+  code_challenge_method=S256
+
+Implementation requirements
+- Use authBaseUrl from getQfOAuthConfig():
+  Redirect to {authBaseUrl}/oauth2/auth
+- Generate:
+  - code_verifier (random)
+  - code_challenge = BASE64URL(SHA256(code_verifier))
+  - state (random) and nonce (random)
+- Persist { state, nonce, codeVerifier, redirectUri } server-side BEFORE redirect:
+  - session store or secure httpOnly cookie
+- On callback:
+  - Validate state matches the persisted value (CSRF protection)
+  - Use the persisted codeVerifier for token exchange
+- Never log secrets. (PKCE verifier is sensitive; do not log it.)
+
+Output shape
+- Export a function buildAuthorizationUrl({ redirectUri, scopes? }) that returns:
+  { url, state, nonce }
+- Persist the codeVerifier internally (do not return it to the browser)
+
+Acceptance checklist
+- Redirect URL includes all required params.
+- state is generated and later validated on callback.
+- codeVerifier is stored server-side and used in Step 3 token exchange.
+- No logs include codeVerifier, tokens, or client_secret.
+
+## 3. Implement Authorization Code token exchange for Quran Foundation OAuth2.
+
+Source of truth
+- Token endpoint path: /oauth2/token
+- Method: POST
+- Content-Type: application/x-www-form-urlencoded
+- grant_type: authorization_code
+- Must send: code, redirect_uri, code_verifier (if PKCE was used)
+- Public clients: include `client_id` in the body
+- Confidential server clients: authenticate the client on the server
+
+Implementation requirements
+- Use authBaseUrl from getQfOAuthConfig():
+  POST {authBaseUrl}/oauth2/token
+- Default to the frontend/native app + backend exchange pattern unless Quran Foundation explicitly confirms that the client is public.
+- Match the exchange method to the provisioned client type:
+  - public => client_id in body, no client_secret
+  - confidential => keep client_secret on the server and exchange on the server
+- Validate callback inputs:
+  - state must match stored value (CSRF protection)
+  - redirect_uri must be exactly the one used in Step 2
+  - server-initiated web flows: the PKCE `code_verifier` value must come from server storage when calling the token endpoint
+  - frontend/native app + backend exchange flows: accept a `codeVerifier` field in the app's JSON callback payload, validate its presence, and forward it as `code_verifier` in the OAuth2 token request body
+- Never log:
+  - client_secret
+  - authorization code
+  - code_verifier
+  - access_token / refresh_token / id_token
+- On failure, throw a clear error:
+  "Failed to exchange authorization code for tokens"
+
+Output shape
+- Export a function exchangeAuthorizationCode({ code, redirectUri, codeVerifier, isConfidential? }) that returns:
+  { access_token, refresh_token?, id_token?, expires_in, scope, token_type }
+
+Acceptance checklist
+- Token exchange succeeds for public PKCE clients.
+- Token exchange succeeds for confidential clients when client_secret is present.
+- Frontend/native app + backend exchange flow accepts code + codeVerifier from the app and forwards code_verifier safely in the OAuth2 token request.
+- Omitting client authentication for a confidential client produces invalid_client.
+- Errors do not leak secrets, codes, or tokens.
+
+## 4. Create an authenticated API client helper for Quran Foundation User APIs.
+
+Headers (copy exactly)
+- x-auth-token: <access token>
+- x-client-id: <client id>
+
+Implementation requirements (server-side)
+- Build a client wrapper that automatically:
+  - injects x-auth-token and x-client-id on every request
+  - targets the correct API base URL from getQfOAuthConfig()
+- For web apps, prefer making the resource call from your backend or proxy layer rather than from page JavaScript.
+- If you intentionally make the resource call from browser code, the browser origin must still be accepted by the target service.
+
+User API base
+- Use apiBaseUrl from config:
+  {apiBaseUrl}/auth/v1/...
+
+Retry behavior
+- If a request returns 401:
+  - if a refresh_token is available, refresh access token once (Step 5)
+  - retry the request once
+  - if it still fails, surface the error (do not loop)
+
+Logging rules
+- Never log access tokens, refresh tokens, id tokens, or client_secret.
+- Logging x-client-id is okay, but optional.
+
+Acceptance checklist
+- All outgoing requests include both required headers.
+- A forced-expired token causes exactly one refresh + one retry (when refresh_token exists).
+- No infinite refresh loops.
+
+## 5. Implement refresh token handling for Quran Foundation OAuth2 (offline_access).
+
+Source of truth
+- Token endpoint path: /oauth2/token
+- Method: POST
+- Content-Type: application/x-www-form-urlencoded
+- grant_type: refresh_token
+- Must send refresh_token
+- Public clients: include `client_id` in the body
+- Confidential clients: use client authentication on the server
+- Default to confidential/server-side refresh unless Quran Foundation explicitly confirms that the client is public
+
+Implementation requirements
+- Use authBaseUrl from getQfOAuthConfig():
+  POST {authBaseUrl}/oauth2/token
+- Keep confidential-client refresh on the server. Public/native clients should use secure device storage if no backend is involved.
+- Store refresh_token securely:
+  - Never store in localStorage in browsers
+  - Prefer server sessions, encrypted storage, or httpOnly secure cookies (app-dependent)
+- Never log refresh_token or access_token.
+- Prevent refresh stampede per user/session:
+  - If multiple requests refresh at once, only one refresh runs; others await it.
+- Update stored access token + expiry (expires_in) after refresh.
+
+Error handling
+- On refresh failure, do not retry aggressively.
+- Surface a clear error:
+  "Failed to refresh access token"
+
+Acceptance checklist
+- Expired access_token triggers exactly one refresh (per session).
+- Refreshed token is used for subsequent API calls.
+- No logs contain tokens or client_secret.
+
+## Harden environment selection and token isolation for Quran Foundation OAuth2.
+
+Server-side
+- Use QF_ENV ("prelive" | "production") to select BOTH:
+  - authBaseUrl
+  - apiBaseUrl
+- Keep tokens isolated per environment:
+  - never reuse a token from one env in the other
+  - separate per-env token stores/caches/session keys
+- Never log tokens (access/refresh/id) or client_secret.
+
+Client-side
+- Public clients (SPA/mobile) MUST use PKCE and must not use client_secret.
+- Prefer server-side backend to hold refresh tokens securely.
+
+Acceptance checklist
+- Switching QF_ENV changes BOTH auth and API bases.
+- Tokens are stored/used per environment and never mixed.
+- Logs remain free of secrets and tokens.
+
+## Add safe error handling for OAuth2 and User API calls.
+
+OAuth2 errors
+- invalid_client: wrong client type, using a public-client example with a confidential client, missing secret for a confidential client, wrong client_id/secret, or wrong environment
+- invalid_grant: code/refresh_token invalid, expired, already used, or clock skew
+- redirect_uri_mismatch: redirect URI differs from registered value
+- invalid_scope: scope is misspelled or not allowed
+
+User API errors
+- 401: missing/expired token:
+  - refresh once (if refresh_token exists), retry once
+  - if still failing, require re-auth (do not loop)
+- 403: browser origin not allowlisted:
+  - move the resource call to your backend, or use an origin the target service allows
+- 403: scope/permission not granted:
+  - hide/disable feature and prompt user for correct consent
+
+Logging rules
+- Never log:
+  - authorization codes
+  - code_verifier
+  - access_token / refresh_token / id_token
+  - client_secret
+- Log only safe diagnostics:
+  - environment (prelive/production)
+  - request path (no query secrets)
+  - status code
+  - short sanitized error body (if present)
+
+Acceptance checklist
+- Errors are actionable (status + hint) without leaking secrets.
+- No infinite token refresh loops.
+
+## Frequently Asked Questions
+What scopes should I request for Quran Foundation OAuth2?
+Use openid offline_access for authentication-only flows. If your app will call User APIs like the collections examples in this guide, request the corresponding API scopes as well, such as user and collection. Follow the principle of least privilege — only request additional scopes for things like user profile, bookmarks, collections, and similar features when your app actually needs them.
+
+How long do Quran Foundation access tokens last?
+Access tokens expire after 1 hour (3,600 seconds). Use the refresh_token (granted via the offline_access scope) to obtain a new access token without requiring the user to log in again. See Step 5: Refresh the Access Token for implementation details.
+
+Can I use the same tokens across pre-production and production?
+No. Tokens issued in the pre-production environment (prelive-oauth2.quran.foundation) will not work against the production API (apis.quran.foundation), and vice versa. Always ensure your authBaseUrl and apiBaseUrl point to the same environment.
+
+Environment	Auth URL	API Base URL
+Pre-Production	https://prelive-oauth2.quran.foundation	https://apis-prelive.quran.foundation
+Production	https://oauth2.quran.foundation	https://apis.quran.foundation
+What is the difference between public and confidential OAuth2 clients?
+Confidential clients have a client_secret that is stored securely on a backend server and used during token exchange and refresh. This is the default for clients issued through Request Access.
+
+Public clients (SPAs, mobile apps) rely solely on PKCE for security and never use a client_secret. Your client is public only if Quran Foundation has explicitly confirmed it.
+
+If you're unsure, assume your client is confidential and use the backend exchange pattern described in Step 3.
+
+What headers do I need to call Quran Foundation User APIs?
+Every request to User APIs requires two custom headers:
+
+x-auth-token: YOUR_ACCESS_TOKEN
+x-client-id: YOUR_CLIENT_ID
+
+For web apps, your backend or serverless proxy should usually be the component that sends these headers to Quran Foundation. See Step 4: Call User APIs with Headers for complete examples in cURL, JavaScript, and Python.
+
+I'm getting invalid_client — what's wrong?
+This usually means you're using some variant of the public client token exchange flow (sending client_id in the request body without a secret) when your client was actually confidential. For confidential clients, the token exchange must be authenticated on the server with the client secret. Check the Troubleshooting table for more details.
+

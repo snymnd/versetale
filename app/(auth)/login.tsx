@@ -1,21 +1,32 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/lib/constants';
 import { useAuth } from '@/features/auth/useAuth';
-import { useAuthStore } from '@/features/auth/authStore';
 
 export default function LoginScreen() {
   const { login, isLoading } = useAuth();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  const busy = isLoading || isSigningIn;
 
   const handleLogin = useCallback(async () => {
-    await login();
-    if (useAuthStore.getState().isAuthenticated) {
-      router.replace('/(tabs)');
+    if (busy) {
+      console.log('[login] already signing in — ignoring tap');
+      return;
     }
-  }, [login]);
+    console.log('[login] starting OAuth flow…');
+    setIsSigningIn(true);
+    try {
+      await login();
+      console.log('[login] OAuth flow finished');
+    } catch (err) {
+      console.error('[login] OAuth flow failed:', err);
+    } finally {
+      setIsSigningIn(false);
+    }
+  }, [login, busy]);
 
   return (
     <LinearGradient
@@ -39,13 +50,21 @@ export default function LoginScreen() {
 
           <Pressable
             onPress={handleLogin}
-            disabled={isLoading}
-            style={({ pressed }) => [styles.signInBtn, pressed && styles.signInBtnPressed]}
+            disabled={busy}
+            style={({ pressed }) => [
+              styles.signInBtn,
+              pressed && !busy && styles.signInBtnPressed,
+              busy && styles.signInBtnDisabled,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Sign in to VerseTale"
+            accessibilityState={{ busy, disabled: busy }}
           >
-            {isLoading ? (
-              <ActivityIndicator color={COLORS.BG_DEEP} />
+            {busy ? (
+              <View style={styles.signInBusyRow}>
+                <ActivityIndicator color={COLORS.BG_DEEP} size="small" />
+                <Text style={styles.signInText}>Signing in…</Text>
+              </View>
             ) : (
               <Text style={styles.signInText}>Sign in with Quran Foundation</Text>
             )}
@@ -116,6 +135,14 @@ const styles = StyleSheet.create({
   signInBtnPressed: {
     opacity: 0.85,
     transform: [{ scale: 0.98 }],
+  },
+  signInBtnDisabled: {
+    opacity: 0.7,
+  },
+  signInBusyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   signInText: {
     fontSize: 16,

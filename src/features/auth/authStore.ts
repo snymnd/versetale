@@ -65,12 +65,18 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    await Promise.all([
-      SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN),
-      SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN),
-      SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ID_TOKEN),
-      SecureStore.deleteItemAsync(SECURE_STORE_KEYS.USER),
-    ]);
+    console.log('[authStore] logout: clearing SecureStore…');
+    try {
+      await Promise.all([
+        SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN),
+        SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN),
+        SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ID_TOKEN),
+        SecureStore.deleteItemAsync(SECURE_STORE_KEYS.USER),
+      ]);
+      console.log('[authStore] logout: SecureStore cleared');
+    } catch (err) {
+      console.error('[authStore] logout: SecureStore clear failed (continuing anyway):', err);
+    }
     set({
       user: null,
       accessToken: null,
@@ -80,6 +86,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       isAuthenticated: false,
       isLoading: false,
     });
+    console.log('[authStore] logout: store state cleared, isAuthenticated=false');
   },
 
   restoreSession: async () => {

@@ -1,8 +1,11 @@
-// expo-av is used for native audio. To migrate to expo-audio (the new API),
-// rebuild the dev client after running: npx expo run:android / npx expo run:ios
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import {
+  setAudioModeAsync,
+  setIsAudioActiveAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+} from 'expo-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, AppStateStatus, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -13,13 +16,7 @@ import { useQuestProgressStore } from '@/features/journeys/journeyStore';
 import { COLORS } from '@/lib/constants';
 
 interface MiniAudioPlayerProps {
-  /**
-   * Ordered list of verse keys for the current quest, e.g. ["12:4","12:5","12:6"].
-   */
   verseKeys: string[];
-  /**
-   * Map of verseKey → audioUrl. If a key is absent or null the player skips silently.
-   */
   audioMap: Record<string, string | null>;
   reciterName?: string;
   onComplete?: () => void;
@@ -91,18 +88,17 @@ function AudioControls({
   );
 }
 
-// ─── Native path ────────────────────────────────────────────────────────────
+// ─── Native path ─────────────────────────────────────────────────────────────
 
 interface BarProps extends MiniAudioPlayerProps {
   currentVerseKey: string | null;
   isPlaying: boolean;
-  setCurrentVerse: (key: string) => void;
+  setCurrentVerse: (key: string | null) => void;
   setPlaying: (v: boolean) => void;
 }
 
 function NativeAudioBar({
   currentVerseKey,
-  isPlaying,
   setCurrentVerse,
   setPlaying,
   verseKeys,
@@ -110,66 +106,97 @@ function NativeAudioBar({
   reciterName = 'Mishary Rashid',
   onComplete,
 }: BarProps) {
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // useAudioPlayer is tied to this component's lifecycle — expo-audio releases
+  // the player automatically on unmount, so no manual singleton is needed.
+  // Start with no source; replace() is called whenever the verse key changes.
+  const player = useAudioPlayer(undefined);
+  const status = useAudioPlayerStatus(player);
 
+  // Tracks which verse key the player is already loaded for, to avoid re-replacing
+  // the source on every render when only unrelated state changes.
+  const loadedKeyRef = useRef<string | null>(null);
+
+  // Configure audio session once on mount.
   useEffect(() => {
-    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false, shouldDuckAndroid: true }).catch(() => {});
-    return () => { soundRef.current?.unloadAsync().catch(() => {}); };
+    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
   }, []);
 
-  const loadAndPlay = useCallback(
-    async (verseKey: string) => {
-      const url = audioMap[verseKey];
-      if (!url) { setPlaying(false); return; }
-
-      setIsLoading(true);
-      try {
-        if (soundRef.current) {
-          await soundRef.current.unloadAsync();
-          soundRef.current = null;
-        }
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: url },
-          { shouldPlay: true },
-          (status: AVPlaybackStatus) => {
-            if (!status.isLoaded) return;
-            if (status.didJustFinish) {
-              const idx = verseKeys.indexOf(verseKey);
-              const nextKey = verseKeys[idx + 1];
-              if (nextKey) { setCurrentVerse(nextKey); }
-              else { setPlaying(false); onComplete?.(); }
-            }
-            setPlaying(status.isPlaying);
-          },
-        );
-        soundRef.current = sound;
-        setPlaying(true);
-      } catch {
-        setPlaying(false);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [audioMap, verseKeys, setCurrentVerse, setPlaying, onComplete],
-  );
-
+  // Replace the audio source and start playing when the selected verse changes.
   useEffect(() => {
-    if (currentVerseKey) loadAndPlay(currentVerseKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentVerseKey]);
-
-  const handlePlayPause = useCallback(async () => {
-    const sound = soundRef.current;
-    if (!sound) {
-      if (currentVerseKey) loadAndPlay(currentVerseKey);
+    if (!currentVerseKey) {
+      player.pause();
+      loadedKeyRef.current = null;
       return;
     }
-    try {
-      if (isPlaying) { await sound.pauseAsync(); setPlaying(false); }
-      else { await sound.playAsync(); setPlaying(true); }
-    } catch { /* ignore */ }
-  }, [isPlaying, currentVerseKey, loadAndPlay, setPlaying]);
+
+    const url = audioMap[currentVerseKey] ?? null;
+    if (!url) {
+      setPlaying(false);
+      return;
+    }
+
+    if (currentVerseKey === loadedKeyRef.current) return;
+    loadedKeyRef.current = currentVerseKey;
+
+    player.replace({ uri: url });
+    player.play();
+  // player identity is stable; audioMap contents are stable per render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentVerseKey]);
+
+  // Sync Zustand isPlaying state from expo-audio's source-of-truth status.
+  useEffect(() => {
+    setPlaying(status.playing);
+  }, [status.playing, setPlaying]);
+
+  // Advance to the next verse when the current one finishes naturally.
+  useEffect(() => {
+    if (!status.didJustFinish || !currentVerseKey) return;
+
+    setPlaying(false);
+    const idx = verseKeys.indexOf(currentVerseKey);
+    const nextKey = verseKeys[idx + 1];
+    if (nextKey) {
+      setCurrentVerse(nextKey);
+    } else {
+      setCurrentVerse(null);
+      onComplete?.();
+    }
+  // Only fire on didJustFinish edge. currentVerseKey and verseKeys are stable
+  // within a single quest render; capturing them via closure is intentional.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status.didJustFinish]);
+
+  // Pause audio when the app is backgrounded / becomes inactive.
+  // setIsAudioActiveAsync(false) gracefully deactivates the audio session,
+  // which avoids the "Unable to activate keep awake" crash from expo-av.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'background' || next === 'inactive') {
+        setIsAudioActiveAsync(false).catch(() => {});
+        player.pause();
+      } else if (next === 'active') {
+        setIsAudioActiveAsync(true).catch(() => {});
+      }
+    });
+    return () => subscription.remove();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlePlayPause = useCallback(() => {
+    if (status.playing) {
+      player.pause();
+    } else {
+      const url = currentVerseKey ? (audioMap[currentVerseKey] ?? null) : null;
+      if (!url) return;
+      // If the player lost its source (e.g. after app resume), reload first.
+      if (!status.isLoaded) {
+        loadedKeyRef.current = null;
+        player.replace({ uri: url });
+      }
+      player.play();
+    }
+  }, [status.playing, status.isLoaded, currentVerseKey, audioMap, player]);
 
   const handlePrev = useCallback(() => {
     if (!currentVerseKey) return;
@@ -187,8 +214,8 @@ function NativeAudioBar({
 
   return (
     <AudioControls
-      isLoading={isLoading}
-      isPlaying={isPlaying}
+      isLoading={status.isBuffering || (!status.isLoaded && !!currentVerseKey)}
+      isPlaying={status.playing}
       canPrev={currentIdx > 0}
       canNext={currentIdx >= 0 && currentIdx < verseKeys.length - 1}
       currentVerseKey={currentVerseKey}
@@ -200,11 +227,10 @@ function NativeAudioBar({
   );
 }
 
-// ─── Web path ────────────────────────────────────────────────────────────────
+// ─── Web path ─────────────────────────────────────────────────────────────────
 
 function WebAudioBar({
   currentVerseKey,
-  isPlaying,
   setCurrentVerse,
   setPlaying,
   verseKeys,
@@ -213,63 +239,90 @@ function WebAudioBar({
   onComplete,
 }: BarProps) {
   const webAudioRef = useRef<HTMLAudioElement | null>(null);
+  const mountedRef = useRef(true);
+  const genRef = useRef(0);
+  const [localIsPlaying, setLocalIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (webAudioRef.current) {
+        webAudioRef.current.pause();
+        webAudioRef.current.src = '';
+        webAudioRef.current = null;
+      }
+    };
+  }, []);
 
   const loadAndPlay = useCallback(
     async (verseKey: string) => {
+      const gen = ++genRef.current;
       const url = audioMap[verseKey];
-      if (!url) { setPlaying(false); return; }
+      if (!url) { setLocalIsPlaying(false); setPlaying(false); return; }
 
-      setIsLoading(true);
+      if (mountedRef.current) setIsLoading(true);
+
+      if (webAudioRef.current) {
+        webAudioRef.current.pause();
+        webAudioRef.current.src = '';
+        webAudioRef.current = null;
+      }
+
+      if (gen !== genRef.current || !mountedRef.current) return;
+
       try {
-        if (webAudioRef.current) {
-          webAudioRef.current.pause();
-          webAudioRef.current.src = '';
-        }
         const audio = new window.Audio(url);
         webAudioRef.current = audio;
         audio.onended = () => {
+          if (gen !== genRef.current || !mountedRef.current) return;
+          setLocalIsPlaying(false);
+          setPlaying(false);
           const idx = verseKeys.indexOf(verseKey);
           const nextKey = verseKeys[idx + 1];
           if (nextKey) { setCurrentVerse(nextKey); }
-          else { setPlaying(false); onComplete?.(); }
+          else { setCurrentVerse(null); onComplete?.(); }
         };
         await audio.play();
+        if (gen !== genRef.current || !mountedRef.current) {
+          audio.pause();
+          return;
+        }
+        setLocalIsPlaying(true);
         setPlaying(true);
       } catch {
-        setPlaying(false);
+        if (mountedRef.current) { setLocalIsPlaying(false); setPlaying(false); }
       } finally {
-        setIsLoading(false);
+        if (mountedRef.current) setIsLoading(false);
       }
     },
     [audioMap, verseKeys, setCurrentVerse, setPlaying, onComplete],
   );
 
   useEffect(() => {
-    if (currentVerseKey) loadAndPlay(currentVerseKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentVerseKey]);
-
-  useEffect(() => {
-    return () => {
+    if (currentVerseKey) {
+      loadAndPlay(currentVerseKey);
+    } else {
+      genRef.current++;
       if (webAudioRef.current) {
         webAudioRef.current.pause();
+        webAudioRef.current.src = '';
         webAudioRef.current = null;
       }
-    };
-  }, []);
+      if (mountedRef.current) { setLocalIsPlaying(false); setIsLoading(false); }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentVerseKey]);
 
   const handlePlayPause = useCallback(async () => {
     const audio = webAudioRef.current;
-    if (!audio) {
-      if (currentVerseKey) loadAndPlay(currentVerseKey);
-      return;
-    }
+    if (!audio) { if (currentVerseKey) loadAndPlay(currentVerseKey); return; }
     try {
-      if (isPlaying) { audio.pause(); setPlaying(false); }
-      else { await audio.play(); setPlaying(true); }
+      if (localIsPlaying) { audio.pause(); setLocalIsPlaying(false); setPlaying(false); }
+      else { await audio.play(); setLocalIsPlaying(true); setPlaying(true); }
     } catch { /* ignore */ }
-  }, [isPlaying, currentVerseKey, loadAndPlay, setPlaying]);
+  }, [localIsPlaying, currentVerseKey, loadAndPlay, setPlaying]);
 
   const handlePrev = useCallback(() => {
     if (!currentVerseKey) return;
@@ -288,7 +341,7 @@ function WebAudioBar({
   return (
     <AudioControls
       isLoading={isLoading}
-      isPlaying={isPlaying}
+      isPlaying={localIsPlaying}
       canPrev={currentIdx > 0}
       canNext={currentIdx >= 0 && currentIdx < verseKeys.length - 1}
       currentVerseKey={currentVerseKey}
@@ -300,7 +353,7 @@ function WebAudioBar({
   );
 }
 
-// ─── Main export ─────────────────────────────────────────────────────────────
+// ─── Main export ──────────────────────────────────────────────────────────────
 
 export function MiniAudioPlayer({
   verseKeys,

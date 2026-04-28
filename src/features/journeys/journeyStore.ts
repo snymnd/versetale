@@ -1,4 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type QuestStatus = 'locked' | 'available' | 'completed';
 
@@ -34,115 +36,130 @@ interface QuestProgressState {
   resetJourney: (journeyId: string) => void;
 
   // Mutations — audio
-  setCurrentVerse: (key: string) => void;
+  setCurrentVerse: (key: string | null) => void;
   setPlaying: (playing: boolean) => void;
   setReciterId: (id: number) => void;
 }
 
-export const useQuestProgressStore = create<QuestProgressState>((set, get) => ({
-  progress: {},
+export const useQuestProgressStore = create<QuestProgressState>()(
+  persist(
+    (set, get) => ({
+      progress: {},
 
-  // Audio defaults
-  currentVerseKey: null,
-  isPlaying: false,
-  reciterId: 7,
+      // Audio defaults
+      currentVerseKey: null,
+      isPlaying: false,
+      reciterId: 7,
 
-  // --- Selectors ---
+      // --- Selectors ---
 
-  getJourneyProgress: (journeyId) => get().progress[journeyId],
+      getJourneyProgress: (journeyId) => get().progress[journeyId],
 
-  getQuestStatus: (journeyId, questId) => {
-    const journey = get().progress[journeyId];
-    return journey?.quests[questId]?.status ?? 'locked';
-  },
-
-  getCompletedCount: (journeyId) => {
-    const journey = get().progress[journeyId];
-    if (!journey) return 0;
-    return Object.values(journey.quests).filter((q) => q.status === 'completed').length;
-  },
-
-  // --- Quest progress mutations ---
-
-  startJourney: (journeyId, questIds) => {
-    const existingJourney = get().progress[journeyId];
-    if (existingJourney) return; // Already started
-
-    const quests: Record<string, QuestProgress> = {};
-    questIds.forEach((id, index) => {
-      quests[id] = {
-        questId: id,
-        status: index === 0 ? 'available' : 'locked',
-      };
-    });
-
-    set((state) => ({
-      progress: {
-        ...state.progress,
-        [journeyId]: {
-          journeyId,
-          startedAt: Date.now(),
-          quests,
-        },
+      getQuestStatus: (journeyId, questId) => {
+        const journey = get().progress[journeyId];
+        return journey?.quests[questId]?.status ?? 'locked';
       },
-    }));
-  },
 
-  completeQuest: (journeyId, questId) => {
-    set((state) => {
-      const journey = state.progress[journeyId];
-      if (!journey) return state;
+      getCompletedCount: (journeyId) => {
+        const journey = get().progress[journeyId];
+        if (!journey) return 0;
+        return Object.values(journey.quests).filter((q) => q.status === 'completed').length;
+      },
 
-      const questKeys = Object.keys(journey.quests);
-      const currentIndex = questKeys.indexOf(questId);
-      const nextQuestId = currentIndex >= 0 ? questKeys[currentIndex + 1] : undefined;
+      // --- Quest progress mutations ---
 
-      const updatedQuests: Record<string, QuestProgress> = {
-        ...journey.quests,
-        [questId]: {
-          ...journey.quests[questId]!,
-          status: 'completed',
-          completedAt: Date.now(),
-        },
-      };
+      startJourney: (journeyId, questIds) => {
+        const existingJourney = get().progress[journeyId];
+        if (existingJourney) return; // Already started
 
-      // Unlock the next quest
-      if (nextQuestId && updatedQuests[nextQuestId]) {
-        updatedQuests[nextQuestId] = {
-          ...updatedQuests[nextQuestId]!,
-          status: 'available',
-        };
-      }
+        const quests: Record<string, QuestProgress> = {};
+        questIds.forEach((id, index) => {
+          quests[id] = {
+            questId: id,
+            status: index === 0 ? 'available' : 'locked',
+          };
+        });
 
-      return {
-        progress: {
-          ...state.progress,
-          [journeyId]: {
-            ...journey,
-            quests: updatedQuests,
+        set((state) => ({
+          progress: {
+            ...state.progress,
+            [journeyId]: {
+              journeyId,
+              startedAt: Date.now(),
+              quests,
+            },
           },
-        },
-      };
-    });
-  },
+        }));
+      },
 
-  /** Alias for completeQuest — used from the reader/reflection screens */
-  markQuestComplete: (journeyId, questId) => {
-    get().completeQuest(journeyId, questId);
-  },
+      completeQuest: (journeyId, questId) => {
+        set((state) => {
+          const journey = state.progress[journeyId];
+          if (!journey) return state;
 
-  resetJourney: (journeyId) => {
-    set((state) => {
-      const { [journeyId]: _removed, ...rest } = state.progress;
-      return { progress: rest };
-    });
-  },
+          const questKeys = Object.keys(journey.quests);
+          const currentIndex = questKeys.indexOf(questId);
+          const nextQuestId = currentIndex >= 0 ? questKeys[currentIndex + 1] : undefined;
 
-  // --- Audio mutations ---
+          const updatedQuests: Record<string, QuestProgress> = {
+            ...journey.quests,
+            [questId]: {
+              ...journey.quests[questId]!,
+              status: 'completed',
+              completedAt: Date.now(),
+            },
+          };
 
-  setCurrentVerse: (key) => set({ currentVerseKey: key }),
+          // Unlock the next quest
+          if (nextQuestId && updatedQuests[nextQuestId]) {
+            updatedQuests[nextQuestId] = {
+              ...updatedQuests[nextQuestId]!,
+              status: 'available',
+            };
+          }
 
-  setPlaying: (playing) => set({ isPlaying: playing }),
+          return {
+            progress: {
+              ...state.progress,
+              [journeyId]: {
+                ...journey,
+                quests: updatedQuests,
+              },
+            },
+          };
+        });
+      },
 
-  setReciterId: (id) => set({ reciterId: id }),
-}));
+      /** Alias for completeQuest — used from the reader/reflection screens */
+      markQuestComplete: (journeyId, questId) => {
+        get().completeQuest(journeyId, questId);
+      },
+
+      resetJourney: (journeyId) => {
+        set((state) => {
+          const { [journeyId]: _removed, ...rest } = state.progress;
+          return { progress: rest };
+        });
+      },
+
+      // --- Audio mutations ---
+
+      setCurrentVerse: (key) => set({ currentVerseKey: key ?? null }),
+
+      setPlaying: (playing) => set({ isPlaying: playing }),
+
+      setReciterId: (id) => set({ reciterId: id }),
+    }),
+    {
+      name: 'versetale-journey-progress',
+      storage: createJSONStorage(() => AsyncStorage),
+      // Only persist user-owned data. Transient audio state (currentVerseKey,
+      // isPlaying) is intentionally excluded — playback should not auto-resume
+      // across cold starts.
+      partialize: (state) => ({
+        progress: state.progress,
+        reciterId: state.reciterId,
+      }),
+    },
+  ),
+);

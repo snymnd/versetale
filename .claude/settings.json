@@ -1,5 +1,40 @@
 {
   "enabledPlugins": {
     "react-native-best-practices@callstack-agent-skills": true
-  }
+  },
+  "disabledSkills": [
+    "python-review",
+    "go-review",
+    "rust-review",
+    "kotlin-review",
+    "flutter-review",
+    "cpp-review",
+    "java-build-resolver",
+    "kotlin-build-resolver",
+    "dart-build-resolver",
+    "cpp-build-resolver",
+    "rust-build-resolver",
+    "go-build-resolver",
+    "springboot-patterns",
+    "springboot-security",
+    "springboot-tdd",
+    "springboot-verification",
+    "django-patterns",
+    "django-security",
+    "django-tdd",
+    "django-verification",
+    "laravel-patterns",
+    "laravel-security",
+    "laravel-tdd",
+    "laravel-verification",
+    "nestjs-patterns",
+    "database-reviewer",
+    "postgres-patterns",
+    "database-migrations",
+    "seo",
+    "seo-specialist",
+    "perl-patterns",
+    "perl-testing",
+    "perl-security"
+  ]
 }

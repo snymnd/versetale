@@ -1,6 +1,5 @@
-import { router } from 'expo-router';
-import { useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/lib/constants';
@@ -12,12 +11,29 @@ export default function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
   const progress = useQuestProgressStore((s) => s.progress);
 
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   const journeyCount = Object.keys(progress).length;
 
   const handleLogout = useCallback(async () => {
-    await logout();
-    router.replace('/(auth)/login');
-  }, [logout]);
+    if (isLoggingOut) {
+      console.log('[profile] logout already in progress — ignoring tap');
+      return;
+    }
+    console.log('[profile] signing out…');
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      console.log('[profile] logout complete — redirect will fire from tabs layout');
+    } catch (err) {
+      console.error('[profile] logout failed:', err);
+    } finally {
+      // Always clear busy state. Even if the tabs-layout redirect fires and
+      // unmounts us, setting state on an unmounting component is a no-op.
+      // If the redirect is delayed for any reason, this prevents a stuck spinner.
+      setIsLoggingOut(false);
+    }
+  }, [logout, isLoggingOut]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -47,11 +63,24 @@ export default function ProfileScreen() {
       {/* Sign out */}
       <Pressable
         onPress={handleLogout}
-        style={({ pressed }) => [styles.logoutBtn, pressed && styles.logoutBtnPressed]}
+        disabled={isLoggingOut}
+        style={({ pressed }) => [
+          styles.logoutBtn,
+          pressed && !isLoggingOut && styles.logoutBtnPressed,
+          isLoggingOut && styles.logoutBtnDisabled,
+        ]}
         accessibilityRole="button"
         accessibilityLabel="Sign out"
+        accessibilityState={{ busy: isLoggingOut, disabled: isLoggingOut }}
       >
-        <Text style={styles.logoutText}>Sign out</Text>
+        {isLoggingOut ? (
+          <View style={styles.logoutBusyRow}>
+            <ActivityIndicator color="#EF4444" size="small" />
+            <Text style={styles.logoutText}>Signing out…</Text>
+          </View>
+        ) : (
+          <Text style={styles.logoutText}>Sign out</Text>
+        )}
       </Pressable>
     </SafeAreaView>
   );
@@ -134,6 +163,14 @@ const styles = StyleSheet.create({
   },
   logoutBtnPressed: {
     opacity: 0.75,
+  },
+  logoutBtnDisabled: {
+    opacity: 0.6,
+  },
+  logoutBusyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   logoutText: {
     fontSize: 15,

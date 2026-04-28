@@ -17,7 +17,7 @@ export default function JourneyLibraryScreen() {
   const { data: journeys, isLoading, isError } = useJourneys();
 
   const handleJourneyPress = useCallback((id: string) => {
-    router.push(`/onboarding/pick-journey?journeyId=${id}`);
+    router.push(`/(tabs)/journey/${id}`);
   }, []);
 
   const renderItem = useCallback(

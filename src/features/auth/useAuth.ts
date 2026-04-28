@@ -1,15 +1,11 @@
 import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
-import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useRef } from 'react';
 
 import { getQfOAuthConfig } from '@/lib/qfOAuthConfig';
 import { useAuthStore } from './authStore';
 
-// Required to complete the auth session on Android
-WebBrowser.maybeCompleteAuthSession();
-
-const SCOPES = ['openid', 'profile', 'email', 'offline_access'];
+const SCOPES = ['openid', 'profile', 'offline_access'];
 
 // Must exactly match the redirect URI registered with Quran Foundation for this client ID.
 // PRD specifies versetale://auth/callback — ensure QF has this registered.
@@ -45,48 +41,58 @@ export function useAuth() {
   );
 
   const login = useCallback(async () => {
-    nonceRef.current = Crypto.randomUUID();
-
-    // Capture state before promptAsync for CSRF validation
     const expectedState = _request?.state;
+    console.log('[useAuth] login() called, redirectUri:', REDIRECT_URI);
 
     const result = await promptAsync();
+    console.log('[useAuth] promptAsync result type:', result.type, result.type === 'error' ? result.error : '');
 
     if (result.type !== 'success') {
+      console.log('[useAuth] auth not successful, aborting');
       return;
     }
 
     const { code, state } = result.params;
+    console.log('[useAuth] received code:', code ? `${code.slice(0, 20)}…` : 'MISSING');
 
-    // CSRF: validate state matches what we sent
     if (expectedState && state !== expectedState) {
+      console.warn('[useAuth] state mismatch — possible CSRF. expected:', expectedState, 'got:', state);
       return;
     }
 
     if (!code) {
+      console.warn('[useAuth] code is missing from params');
       return;
+    }
+
+    const codeVerifier = _request?.codeVerifier;
+    console.log('[useAuth] codeVerifier present:', !!codeVerifier);
+    if (!codeVerifier) {
+      throw new Error('PKCE code verifier is missing — cannot exchange code');
     }
 
     let tokenResponse: AuthSession.TokenResponse;
     try {
+      console.log('[useAuth] exchanging code for tokens…');
       tokenResponse = await AuthSession.exchangeCodeAsync(
         {
           clientId: config.clientId,
+          clientSecret: config.clientSecret,
           redirectUri: REDIRECT_URI,
           code,
-          extraParams: {
-            code_verifier: _request?.codeVerifier ?? '',
-          },
+          extraParams: { code_verifier: codeVerifier },
         },
         discovery,
       );
-    } catch {
-      throw new Error('Failed to exchange authorization code for tokens');
+      console.log('[useAuth] token exchange success, accessToken present:', !!tokenResponse.accessToken);
+    } catch (err) {
+      throw new Error(`Failed to exchange authorization code: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     const { accessToken: token, refreshToken, idToken, expiresIn } = tokenResponse;
 
     if (!token) {
+      console.warn('[useAuth] no accessToken in token response');
       return;
     }
 
@@ -103,8 +109,8 @@ export function useAuth() {
             nonce?: string;
           };
 
-          // Validate nonce to prevent replay attacks
           if (decoded.nonce && decoded.nonce !== nonceRef.current) {
+            console.warn('[useAuth] nonce mismatch — possible replay attack');
             return;
           }
 
@@ -114,11 +120,12 @@ export function useAuth() {
             email: decoded.email ?? userInfo.email,
           };
         }
-      } catch {
-        // Fall back to defaults if JWT parsing fails
+      } catch (err) {
+        console.warn('[useAuth] failed to parse idToken JWT:', err);
       }
     }
 
+    console.log('[useAuth] calling _setSession for user:', userInfo.sub);
     await _setSession({
       accessToken: token,
       refreshToken: refreshToken ?? undefined,
@@ -126,6 +133,7 @@ export function useAuth() {
       expiresIn: expiresIn ?? undefined,
       user: userInfo,
     });
+    console.log('[useAuth] _setSession complete');
   }, [promptAsync, _request, _setSession, config.clientId, config.authBaseUrl]);
 
   return {

@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,23 +21,25 @@ export default function JourneyDetailScreen() {
   const { journeyId } = useLocalSearchParams<{ journeyId: string }>();
   const { data: journey, isLoading, isError } = useJourneyDetail(journeyId);
 
-  const getQuestStatus = useQuestProgressStore((s) => s.getQuestStatus);
+  const journeyProgress = useQuestProgressStore((s) => s.progress[journeyId]);
   const startJourney = useQuestProgressStore((s) => s.startJourney);
+
+  // Start the journey (unlocks day 1) as soon as the detail loads — idempotent if already started
+  useEffect(() => {
+    if (journey) {
+      startJourney(
+        journeyId,
+        journey.quests.map((q) => q.id),
+      );
+    }
+  }, [journey, journeyId, startJourney]);
 
   const handleQuestPress = useCallback(
     (quest: QuestItemData) => {
       if (quest.status === 'locked') return;
-
-      // Ensure journey is started (idempotent)
-      if (journey) {
-        startJourney(
-          journeyId,
-          journey.quests.map((q) => q.id),
-        );
-      }
-      router.push(`/reader/${journeyId}/${quest.id}`);
+      router.push(`/(tabs)/reader/${journeyId}/${quest.id}`);
     },
-    [journey, journeyId, startJourney],
+    [journeyId],
   );
 
   if (isLoading) {
@@ -51,14 +53,25 @@ export default function JourneyDetailScreen() {
   if (isError || !journey) {
     return (
       <SafeAreaView style={styles.loadingContainer} edges={['top']}>
-        <Text style={styles.errorText}>Could not load journey.</Text>
+        <Text style={styles.emptyIcon}>📖</Text>
+        <Text style={styles.errorTitle}>Journey not found</Text>
+        <Text style={styles.errorText}>This journey couldn't be loaded.</Text>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) router.back();
+            else router.replace('/(tabs)');
+          }}
+          style={styles.backLink}
+        >
+          <Text style={styles.backLinkText}>← Back to library</Text>
+        </Pressable>
       </SafeAreaView>
     );
   }
 
   const questsWithStatus: QuestItemData[] = journey.quests.map((q) => ({
     ...q,
-    status: getQuestStatus(journeyId, q.id),
+    status: journeyProgress?.quests[q.id]?.status ?? 'locked',
   }));
 
   const completedCount = questsWithStatus.filter((q) => q.status === 'completed').length;
@@ -113,7 +126,10 @@ function JourneyHero({
     <View style={styles.heroContainer}>
       {/* Back button */}
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/(tabs)');
+        }}
         style={styles.backBtn}
         accessibilityLabel="Go back"
       >
@@ -208,10 +224,36 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.BG_DEEP,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 32,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 8,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.TEXT_PRIMARY,
+    textAlign: 'center',
   },
   errorText: {
     color: COLORS.TEXT_SECONDARY,
-    fontSize: 15,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  backLink: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.CARD_BORDER,
+  },
+  backLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.ACCENT,
   },
   listContent: {
     paddingBottom: 40,

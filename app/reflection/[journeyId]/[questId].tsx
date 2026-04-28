@@ -51,8 +51,7 @@ export default function ReflectionScreen() {
           savedAt: Date.now(),
         }),
       );
-      // Navigate back to journey detail after saving
-      router.replace(`/journey/${journeyId}`);
+      router.replace(`/(tabs)/journey/${journeyId}`);
     } catch {
       Alert.alert('Error', 'Could not save your reflection. Please try again.');
     } finally {
@@ -61,7 +60,7 @@ export default function ReflectionScreen() {
   }, [note, journeyId, questId]);
 
   const handleSkip = useCallback(() => {
-    router.replace(`/journey/${journeyId}`);
+    router.replace(`/(tabs)/journey/${journeyId}`);
   }, [journeyId]);
 
   return (

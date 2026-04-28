@@ -41,3 +41,9 @@ yarn-error.*
 /ios
 /android
 /.idea
+
+# ai
+*.claude/
+CLAUDE.md
+*.note
+.claude/settings.json

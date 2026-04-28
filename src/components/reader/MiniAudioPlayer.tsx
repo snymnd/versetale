@@ -105,7 +105,7 @@ function NativeAudioBar({
   audioMap,
   reciterName = 'Mishary Rashid',
   onComplete,
-}: BarProps) {
+}: Omit<BarProps, 'isPlaying'>) {
   // useAudioPlayer is tied to this component's lifecycle — expo-audio releases
   // the player automatically on unmount, so no manual singleton is needed.
   // Start with no source; replace() is called whenever the verse key changes.
@@ -115,6 +115,11 @@ function NativeAudioBar({
   // Tracks which verse key the player is already loaded for, to avoid re-replacing
   // the source on every render when only unrelated state changes.
   const loadedKeyRef = useRef<string | null>(null);
+
+  // Ref that always holds the latest currentVerseKey so the didJustFinish
+  // effect can read it without creating a stale closure.
+  const currentVerseKeyRef = useRef(currentVerseKey);
+  useEffect(() => { currentVerseKeyRef.current = currentVerseKey; }, [currentVerseKey]);
 
   // Configure audio session once on mount.
   useEffect(() => {
@@ -150,11 +155,15 @@ function NativeAudioBar({
   }, [status.playing, setPlaying]);
 
   // Advance to the next verse when the current one finishes naturally.
+  // currentVerseKey is read from a ref to avoid stale closure issues when the
+  // user taps Next mid-playback and didJustFinish fires on the old verse.
   useEffect(() => {
-    if (!status.didJustFinish || !currentVerseKey) return;
+    if (!status.didJustFinish) return;
+    const key = currentVerseKeyRef.current;
+    if (!key) return;
 
     setPlaying(false);
-    const idx = verseKeys.indexOf(currentVerseKey);
+    const idx = verseKeys.indexOf(key);
     const nextKey = verseKeys[idx + 1];
     if (nextKey) {
       setCurrentVerse(nextKey);
@@ -162,10 +171,7 @@ function NativeAudioBar({
       setCurrentVerse(null);
       onComplete?.();
     }
-  // Only fire on didJustFinish edge. currentVerseKey and verseKeys are stable
-  // within a single quest render; capturing them via closure is intentional.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status.didJustFinish]);
+  }, [status.didJustFinish, verseKeys, setCurrentVerse, setPlaying, onComplete]);
 
   // Pause audio when the app is backgrounded / becomes inactive.
   // setIsAudioActiveAsync(false) gracefully deactivates the audio session,

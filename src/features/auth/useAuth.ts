@@ -41,60 +41,48 @@ export function useAuth() {
   );
 
   const login = useCallback(async () => {
+    // Refresh nonce on each attempt to prevent replay attacks across retries.
+    nonceRef.current = Crypto.randomUUID();
+
     const expectedState = _request?.state;
-    console.log('[useAuth] login() called, redirectUri:', REDIRECT_URI);
 
     const result = await promptAsync();
-    console.log('[useAuth] promptAsync result type:', result.type, result.type === 'error' ? result.error : '');
 
-    if (result.type !== 'success') {
-      console.log('[useAuth] auth not successful, aborting');
-      return;
-    }
+    if (result.type !== 'success') return;
 
     const { code, state } = result.params;
-    console.log('[useAuth] received code:', code ? `${code.slice(0, 20)}…` : 'MISSING');
 
     if (expectedState && state !== expectedState) {
-      console.warn('[useAuth] state mismatch — possible CSRF. expected:', expectedState, 'got:', state);
+      if (__DEV__) console.warn('[useAuth] state mismatch — possible CSRF');
       return;
     }
 
-    if (!code) {
-      console.warn('[useAuth] code is missing from params');
-      return;
-    }
+    if (!code) return;
 
     const codeVerifier = _request?.codeVerifier;
-    console.log('[useAuth] codeVerifier present:', !!codeVerifier);
     if (!codeVerifier) {
       throw new Error('PKCE code verifier is missing — cannot exchange code');
     }
 
     let tokenResponse: AuthSession.TokenResponse;
     try {
-      console.log('[useAuth] exchanging code for tokens…');
+      // Mobile apps are public OAuth clients — clientSecret must NOT be sent.
+      // Security is provided by PKCE (code_verifier / code_challenge).
       tokenResponse = await AuthSession.exchangeCodeAsync(
         {
           clientId: config.clientId,
-          clientSecret: config.clientSecret,
           redirectUri: REDIRECT_URI,
           code,
           extraParams: { code_verifier: codeVerifier },
         },
         discovery,
       );
-      console.log('[useAuth] token exchange success, accessToken present:', !!tokenResponse.accessToken);
     } catch (err) {
       throw new Error(`Failed to exchange authorization code: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     const { accessToken: token, refreshToken, idToken, expiresIn } = tokenResponse;
-
-    if (!token) {
-      console.warn('[useAuth] no accessToken in token response');
-      return;
-    }
+    if (!token) return;
 
     let userInfo = { sub: state ?? 'unknown', name: 'VerseTale User', email: '' };
 
@@ -110,7 +98,7 @@ export function useAuth() {
           };
 
           if (decoded.nonce && decoded.nonce !== nonceRef.current) {
-            console.warn('[useAuth] nonce mismatch — possible replay attack');
+            if (__DEV__) console.warn('[useAuth] nonce mismatch — possible replay attack');
             return;
           }
 
@@ -120,12 +108,9 @@ export function useAuth() {
             email: decoded.email ?? userInfo.email,
           };
         }
-      } catch (err) {
-        console.warn('[useAuth] failed to parse idToken JWT:', err);
-      }
+      } catch { /* malformed idToken — fall back to defaults */ }
     }
 
-    console.log('[useAuth] calling _setSession for user:', userInfo.sub);
     await _setSession({
       accessToken: token,
       refreshToken: refreshToken ?? undefined,
@@ -133,7 +118,6 @@ export function useAuth() {
       expiresIn: expiresIn ?? undefined,
       user: userInfo,
     });
-    console.log('[useAuth] _setSession complete');
   }, [promptAsync, _request, _setSession, config.clientId, config.authBaseUrl]);
 
   return {

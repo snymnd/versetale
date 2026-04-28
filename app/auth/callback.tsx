@@ -6,8 +6,7 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useAuthStore } from '@/features/auth/authStore';
 import { COLORS } from '@/lib/constants';
 
-const result = WebBrowser.maybeCompleteAuthSession();
-console.log('[auth/callback] maybeCompleteAuthSession result:', result);
+WebBrowser.maybeCompleteAuthSession();
 
 export default function AuthCallback() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -33,11 +32,7 @@ export default function AuthCallback() {
   }, [opacity, rotation]);
 
   useEffect(() => {
-    console.log('[auth/callback] isAuthenticated changed:', isAuthenticated);
-    if (isAuthenticated) {
-      console.log('[auth/callback] navigating to /(tabs)');
-      router.replace('/(tabs)');
-    }
+    if (isAuthenticated) router.replace('/(tabs)');
   }, [isAuthenticated]);
 
   const spin = rotation.interpolate({

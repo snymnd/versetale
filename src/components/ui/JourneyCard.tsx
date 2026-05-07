@@ -1,108 +1,120 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRef, useCallback } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 
-import { COLORS } from '@/lib/constants';
+import { ArchesPattern, OrnamentStar } from '@/components/brand';
+import { Text } from '@/components/ui/Text';
+import { palette, radii, spacing, typography, useColors } from '@/lib/theme';
 import type { JourneySummary } from '@/features/journeys/useJourneys';
 
 interface JourneyCardProps {
   journey: JourneySummary;
   onPress: (id: string) => void;
+  /** Reading progress 0..1 — if provided, renders a hairline bar. */
+  progress?: number;
+  /** "Day 4 / 12" or "12 verses · 9 min" — short status line under the title. */
+  statusLine?: string;
+  /** Sūrah reference, e.g. `Sūrah 12 · al-Yūsuf`. */
+  reference?: string;
 }
 
 /**
- * Editorial-style card showing a journey with:
- * - Full-bleed cover gradient
- * - Arabic subtitle overlaid on gradient
- * - English title, description, quest count badge
- * - Scale + opacity press animation via Reanimated-compatible Animated API
+ * Compact list-row journey card — 76×96 gradient cover with arches
+ * overlay and an ornament, paired with a Fraunces title, mono Sūrah
+ * reference, and (optionally) a hairline progress track + day counter.
+ *
+ * Ports the "Your journeys" row pattern from the design system kit.
  */
-export function JourneyCard({ journey, onPress }: JourneyCardProps) {
+export function JourneyCard({
+  journey,
+  onPress,
+  progress,
+  statusLine,
+  reference,
+}: JourneyCardProps) {
+  const { colors, shadow } = useColors();
   const scale = useRef(new Animated.Value(1)).current;
-  const pressOpacity = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = useCallback(() => {
-    Animated.parallel([
-      Animated.spring(scale, {
-        toValue: 0.97,
-        useNativeDriver: true,
-        speed: 50,
-        bounciness: 0,
-      }),
-      Animated.timing(pressOpacity, {
-        toValue: 0.88,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [scale, pressOpacity]);
+    Animated.timing(scale, { toValue: 0.98, duration: 150, useNativeDriver: true }).start();
+  }, [scale]);
 
   const handlePressOut = useCallback(() => {
-    Animated.parallel([
-      Animated.spring(scale, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 30,
-        bounciness: 4,
-      }),
-      Animated.timing(pressOpacity, {
-        toValue: 1,
-        duration: 120,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [scale, pressOpacity]);
+    Animated.timing(scale, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+  }, [scale]);
 
   const gradientColors = journey.coverGradient as [string, string];
+  const ref = reference ?? `${journey.totalQuests} ${journey.totalQuests === 1 ? 'day' : 'days'}`;
 
   return (
-    <Animated.View style={[styles.wrapper, { transform: [{ scale }], opacity: pressOpacity }]}>
+    <Animated.View
+      style={[
+        styles.wrapper,
+        shadow.sm,
+        { backgroundColor: colors.bgRaised, transform: [{ scale }] },
+      ]}
+    >
       <Pressable
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={() => onPress(journey.id)}
         accessibilityRole="button"
-        accessibilityLabel={`Start journey: ${journey.title}`}
+        accessibilityLabel={`Open journey: ${journey.title}`}
         style={styles.pressable}
       >
-        {/* Cover gradient with Arabic subtitle */}
+        {/* Cover — 76×96 gradient with arches overlay + ornament */}
         <LinearGradient
           colors={gradientColors}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={{ x: 0.5, y: 1 }}
           style={styles.cover}
         >
-          {/* Decorative grain overlay */}
-          <View style={styles.grainOverlay} />
-
-          <View style={styles.coverContent}>
-            <Text style={styles.arabicSubtitle} numberOfLines={1}>
-              {journey.titleArabic}
-            </Text>
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            <ArchesPattern color="#FFFFFF" opacity={0.18} tileSize={80} />
+          </View>
+          <View style={styles.ornamentSlot}>
+            <OrnamentStar size={18} color="rgba(242,198,129,0.85)" />
           </View>
         </LinearGradient>
 
-        {/* Card body */}
+        {/* Body */}
         <View style={styles.body}>
           <View style={styles.bodyTop}>
-            <Text style={styles.title} numberOfLines={2}>
-              {journey.title}
+            <Text variant="mono" tone="subtle" numberOfLines={1} style={styles.refLine}>
+              {ref}
             </Text>
-            <Text style={styles.description} numberOfLines={2}>
-              {journey.description}
+            <Text
+              variant="h4"
+              numberOfLines={2}
+              style={[styles.titleLine, { fontFamily: typography.h3.fontFamily }]}
+            >
+              {journey.title}
             </Text>
           </View>
 
-          <View style={styles.footer}>
-            {/* Quest count badge */}
-            <View style={styles.questBadge}>
-              <Text style={styles.questBadgeText}>{journey.totalQuests} quests</Text>
-            </View>
-
-            {/* Difficulty chip */}
-            <View style={styles.difficultyChip}>
-              <Text style={styles.difficultyText}>{journey.difficulty}</Text>
-            </View>
+          <View style={styles.bodyBottom}>
+            {progress !== undefined ? (
+              <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${Math.max(0, Math.min(1, progress)) * 100}%`,
+                      backgroundColor: colors.brand,
+                    },
+                  ]}
+                />
+              </View>
+            ) : null}
+            {statusLine ? (
+              <Text variant="meta" tone="muted" style={styles.statusLine}>
+                {statusLine}
+              </Text>
+            ) : (
+              <Text variant="meta" tone="muted" numberOfLines={2} style={styles.statusLine}>
+                {journey.description}
+              </Text>
+            )}
           </View>
         </View>
       </Pressable>
@@ -112,84 +124,58 @@ export function JourneyCard({ journey, onPress }: JourneyCardProps) {
 
 const styles = StyleSheet.create({
   wrapper: {
-    borderRadius: 16,
-    marginBottom: 16,
-    backgroundColor: COLORS.CARD_BG,
-    borderWidth: 1,
-    borderColor: COLORS.CARD_BORDER,
+    borderRadius: radii.lg,
+    marginBottom: spacing[3],
     overflow: 'hidden',
   },
   pressable: {
-    flex: 1,
+    flexDirection: 'row',
+    gap: 14,
+    padding: spacing[3],
   },
   cover: {
-    height: 130,
-    justifyContent: 'flex-end',
-    padding: 16,
+    width: 76,
+    height: 96,
+    borderRadius: radii.md,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  grainOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-  },
-  coverContent: {
-    alignItems: 'flex-end',
-  },
-  arabicSubtitle: {
-    fontFamily: 'AmiriQuran',
-    fontSize: 24,
-    color: 'rgba(255,255,255,0.9)',
-    textAlign: 'right',
-    writingDirection: 'rtl',
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+  ornamentSlot: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
   },
   body: {
-    padding: 16,
-    gap: 12,
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'space-between',
+    paddingVertical: 2,
   },
   bodyTop: {
     gap: 4,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -0.3,
+  refLine: {
+    fontSize: 10,
+    letterSpacing: 0.6,
+    color: palette.ink[400],
   },
-  description: {
-    fontSize: 13,
-    color: COLORS.TEXT_SECONDARY,
-    lineHeight: 18,
+  titleLine: {
+    fontSize: 17,
+    lineHeight: 21,
+    letterSpacing: -0.34,
   },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  bodyBottom: {
+    gap: 6,
   },
-  questBadge: {
-    backgroundColor: 'rgba(20,184,166,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.35)',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  progressTrack: {
+    height: 3,
+    borderRadius: 2,
+    overflow: 'hidden',
   },
-  questBadgeText: {
+  progressFill: {
+    height: '100%',
+  },
+  statusLine: {
     fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.ACCENT,
-    letterSpacing: 0.2,
-  },
-  difficultyChip: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  difficultyText: {
-    fontSize: 11,
-    color: COLORS.TEXT_TERTIARY,
-    textTransform: 'capitalize',
   },
 });

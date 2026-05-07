@@ -1,30 +1,33 @@
 import { FlashList } from '@shopify/flash-list';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
+import { ChevronLeft, ChevronRight, Lock } from 'lucide-react-native';
 import { useCallback, useEffect } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { COLORS } from '@/lib/constants';
+import { HeroDusk, OrnamentStar } from '@/components/brand';
+import { Eyebrow, Text } from '@/components/ui';
+import { fontFamily, palette, radii, spacing, typography, useColors } from '@/lib/theme';
 import { useJourneyDetail, type Quest } from '@/features/journeys/useJourneyDetail';
 import { useQuestProgressStore } from '@/features/journeys/journeyStore';
 
 type QuestItemData = Quest & { status: 'locked' | 'available' | 'completed' };
 
 /**
- * Journey detail screen — hero cover + scrollable quest list.
- * Locked quests are visually dimmed with a lock indicator.
- * Completed quests show a teal checkmark.
- * Tapping an available quest navigates to the reader.
+ * Journey detail — gradient hero with the journey's signature wash + the
+ * Arabic title set in Amiri, the English title and supporting copy in
+ * Fraunces, then a stack of quest rows. Locked quests are dimmed with a
+ * lock icon; completed quests get a teal check.
  */
 export default function JourneyDetailScreen() {
   const { journeyId } = useLocalSearchParams<{ journeyId: string }>();
   const { data: journey, isLoading, isError } = useJourneyDetail(journeyId);
+  const { colors } = useColors();
 
   const journeyProgress = useQuestProgressStore((s) => s.progress[journeyId]);
   const startJourney = useQuestProgressStore((s) => s.startJourney);
 
-  // Start the journey (unlocks day 1) as soon as the detail loads — idempotent if already started
+  // Idempotent — start the journey (unlocks day 1) when the detail loads.
   useEffect(() => {
     if (journey) {
       startJourney(
@@ -42,28 +45,33 @@ export default function JourneyDetailScreen() {
     [journeyId],
   );
 
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  }, []);
+
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer} edges={['top']}>
-        <ActivityIndicator color={COLORS.ACCENT} />
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator color={colors.brand} />
       </SafeAreaView>
     );
   }
 
   if (isError || !journey) {
     return (
-      <SafeAreaView style={styles.loadingContainer} edges={['top']}>
-        <Text style={styles.emptyIcon}>📖</Text>
-        <Text style={styles.errorTitle}>Journey not found</Text>
-        <Text style={styles.errorText}>This journey couldn't be loaded.</Text>
-        <Pressable
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace('/(tabs)');
-          }}
-          style={styles.backLink}
-        >
-          <Text style={styles.backLinkText}>← Back to library</Text>
+      <SafeAreaView
+        style={[styles.loadingContainer, { backgroundColor: colors.bg }]}
+        edges={['top']}
+      >
+        <Text variant="h3">Journey not found</Text>
+        <Text variant="caption" tone="muted" style={styles.errorText}>
+          This journey couldn't be loaded.
+        </Text>
+        <Pressable onPress={handleBack} style={[styles.backLink, { borderColor: colors.border }]}>
+          <Text variant="meta" tone="brand">
+            ← Back to library
+          </Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -73,15 +81,14 @@ export default function JourneyDetailScreen() {
     ...q,
     status: journeyProgress?.quests[q.id]?.status ?? 'locked',
   }));
-
   const completedCount = questsWithStatus.filter((q) => q.status === 'completed').length;
 
   const renderItem = ({ item }: { item: QuestItemData }) => (
-    <QuestRow quest={item} onPress={handleQuestPress} />
+    <QuestRow quest={item} onPress={handleQuestPress} totalQuests={journey.totalQuests} />
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <FlashList
         data={questsWithStatus}
         keyExtractor={(item) => item.id}
@@ -95,15 +102,14 @@ export default function JourneyDetailScreen() {
             gradient={journey.coverGradient}
             completedCount={completedCount}
             totalQuests={journey.totalQuests}
+            onBack={handleBack}
           />
         }
         contentContainerStyle={styles.listContent}
       />
-    </SafeAreaView>
+    </View>
   );
 }
-
-// --- Sub-components ---
 
 interface JourneyHeroProps {
   title: string;
@@ -112,70 +118,85 @@ interface JourneyHeroProps {
   gradient: [string, string];
   completedCount: number;
   totalQuests: number;
+  onBack: () => void;
 }
 
 function JourneyHero({
   title,
   titleArabic,
   description,
-  gradient,
   completedCount,
   totalQuests,
+  onBack,
 }: JourneyHeroProps) {
+  const { colors } = useColors();
   return (
-    <View style={styles.heroContainer}>
-      {/* Back button */}
-      <Pressable
-        onPress={() => {
-          if (router.canGoBack()) router.back();
-          else router.replace('/(tabs)');
-        }}
-        style={styles.backBtn}
-        accessibilityLabel="Go back"
-      >
-        <Text style={styles.backIcon}>{'←'}</Text>
-      </Pressable>
+    <View style={styles.hero}>
+      <SafeAreaView edges={['top']}>
+        <HeroDusk style={styles.heroSurface}>
+          <Pressable
+            onPress={onBack}
+            style={styles.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            hitSlop={10}
+          >
+            <ChevronLeft color="#FFFFFF" size={20} strokeWidth={1.75} />
+          </Pressable>
 
-      {/* Full-width gradient cover */}
-      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroCover}>
-        <View style={styles.heroGrainOverlay} />
-        <Text style={styles.heroArabic} accessibilityLanguage="ar">
-          {titleArabic}
-        </Text>
-      </LinearGradient>
+          <View style={styles.heroOrnament}>
+            <OrnamentStar size={32} color={palette.amber[300]} />
+          </View>
 
-      {/* Title block below gradient */}
-      <View style={styles.heroBody}>
+          <View style={styles.heroBodyRow}>
+            <Text
+              style={styles.heroArabic}
+              accessibilityLanguage="ar"
+              color="rgba(255,255,255,0.94)"
+            >
+              {titleArabic}
+            </Text>
+          </View>
+        </HeroDusk>
+      </SafeAreaView>
+
+      <View style={[styles.heroFoot, { backgroundColor: colors.bg }]}>
         <Text style={styles.heroTitle}>{title}</Text>
-        <Text style={styles.heroDescription}>{description}</Text>
+        <Text variant="read" tone="muted" style={styles.heroDescription}>
+          {description}
+        </Text>
 
-        {/* Progress bar */}
         <View style={styles.progressRow}>
-          <View style={styles.progressTrack}>
+          <View style={[styles.progressTrack, { backgroundColor: colors.bgMuted }]}>
             <View
               style={[
                 styles.progressFill,
-                { width: `${totalQuests > 0 ? (completedCount / totalQuests) * 100 : 0}%` },
+                {
+                  width: `${totalQuests > 0 ? (completedCount / totalQuests) * 100 : 0}%`,
+                  backgroundColor: colors.brand,
+                },
               ]}
             />
           </View>
-          <Text style={styles.progressLabel}>
+          <Text variant="mono" tone="brand" style={styles.progressLabel}>
             {completedCount}/{totalQuests} days
           </Text>
         </View>
-      </View>
 
-      <Text style={styles.sectionLabel}>Your Journey</Text>
+        <Eyebrow style={styles.sectionLabel}>Your Journey</Eyebrow>
+      </View>
     </View>
   );
 }
 
 interface QuestRowProps {
   quest: QuestItemData;
+  totalQuests: number;
   onPress: (quest: QuestItemData) => void;
 }
 
-function QuestRow({ quest, onPress }: QuestRowProps) {
+function QuestRow({ quest, totalQuests, onPress }: QuestRowProps) {
+  const { colors, shadow } = useColors();
   const isLocked = quest.status === 'locked';
   const isCompleted = quest.status === 'completed';
 
@@ -184,246 +205,177 @@ function QuestRow({ quest, onPress }: QuestRowProps) {
       onPress={() => onPress(quest)}
       disabled={isLocked}
       accessibilityRole="button"
-      accessibilityLabel={`Day ${quest.day}: ${quest.title}${isLocked ? ', locked' : ''}`}
-      style={({ pressed }) => [styles.questRow, pressed && !isLocked && styles.questRowPressed]}
+      accessibilityLabel={`Day ${quest.day} of ${totalQuests}: ${quest.title}${
+        isLocked ? ', locked' : ''
+      }`}
+      style={({ pressed }) => [
+        styles.questRow,
+        shadow.sm,
+        {
+          backgroundColor: colors.bgRaised,
+          opacity: isLocked ? 0.55 : 1,
+          transform: pressed && !isLocked ? [{ scale: 0.98 }] : undefined,
+        },
+      ]}
     >
-      {/* Day number circle */}
-      <View style={[styles.dayCircle, isCompleted && styles.dayCircleCompleted, isLocked && styles.dayCircleLocked]}>
+      <View
+        style={[
+          styles.dayCircle,
+          isCompleted
+            ? { backgroundColor: 'rgba(20,184,166,0.18)', borderColor: colors.brand }
+            : isLocked
+              ? { backgroundColor: colors.bgMuted, borderColor: colors.border }
+              : { backgroundColor: 'rgba(31,122,132,0.16)', borderColor: 'rgba(31,122,132,0.4)' },
+        ]}
+      >
         {isCompleted ? (
-          <Text style={styles.checkmark}>✓</Text>
+          <Text style={[styles.checkmark, { color: colors.brand }]}>✓</Text>
         ) : (
-          <Text style={[styles.dayNumber, isLocked && styles.dayNumberLocked]}>{quest.day}</Text>
+          <Text
+            variant="meta"
+            style={[styles.dayNumber, { color: isLocked ? colors.fgSubtle : colors.brandFg }]}
+          >
+            {quest.day}
+          </Text>
         )}
       </View>
 
-      {/* Quest info */}
       <View style={styles.questInfo}>
-        <Text style={[styles.questTitle, isLocked && styles.questTitleLocked]} numberOfLines={1}>
-          {quest.title}
+        <Text variant="mono" tone="subtle" style={styles.questRef}>
+          Day {quest.day} of {totalQuests}
         </Text>
-        <Text style={[styles.questArabic, isLocked && styles.questArabicLocked]} numberOfLines={1}>
-          {quest.titleArabic}
+        <Text style={styles.questTitle} numberOfLines={1}>
+          {quest.title}
         </Text>
       </View>
 
-      {/* Right indicator */}
-      <Text style={[styles.chevron, isLocked && styles.chevronLocked]}>
-        {isLocked ? '🔒' : '›'}
-      </Text>
+      {isLocked ? (
+        <Lock size={14} color={colors.fgSubtle} strokeWidth={1.75} />
+      ) : (
+        <ChevronRight size={18} color={colors.fgMuted} strokeWidth={1.75} />
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BG_DEEP,
-  },
+  container: { flex: 1 },
   loadingContainer: {
     flex: 1,
-    backgroundColor: COLORS.BG_DEEP,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     paddingHorizontal: 32,
+    gap: 8,
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.TEXT_PRIMARY,
-    textAlign: 'center',
-  },
-  errorText: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 14,
-    textAlign: 'center',
-  },
+  errorText: { textAlign: 'center', marginTop: 4 },
   backLink: {
     marginTop: 16,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: COLORS.CARD_BORDER,
   },
-  backLinkText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.ACCENT,
-  },
-  listContent: {
-    paddingBottom: 40,
-  },
+  listContent: { paddingBottom: 120 },
 
   // Hero
-  heroContainer: {
-    marginBottom: 8,
+  hero: { marginBottom: spacing[2] },
+  heroSurface: {
+    paddingBottom: spacing[8],
+    paddingHorizontal: 20,
+    paddingTop: spacing[2],
+    minHeight: 240,
+    justifyContent: 'space-between',
   },
   backBtn: {
-    position: 'absolute',
-    top: 12,
-    left: 16,
-    zIndex: 10,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.30)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backIcon: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 20,
+  heroOrnament: {
+    alignSelf: 'center',
+    marginVertical: spacing[6],
   },
-  heroCover: {
-    height: 220,
-    justifyContent: 'flex-end',
-    padding: 20,
-  },
-  heroGrainOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.12)',
-  },
+  heroBodyRow: {},
   heroArabic: {
     fontFamily: 'AmiriQuran',
     fontSize: 32,
-    color: 'rgba(255,255,255,0.95)',
     textAlign: 'right',
     writingDirection: 'rtl',
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
   },
-  heroBody: {
+  heroFoot: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
-    gap: 8,
+    paddingTop: spacing[5],
+    gap: spacing[2],
   },
   heroTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -0.6,
+    fontFamily: fontFamily.displayMedium,
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: -0.56,
+    color: palette.ink[25],
   },
   heroDescription: {
-    fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 2,
   },
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 4,
+    marginTop: spacing[2],
   },
   progressTrack: {
     flex: 1,
     height: 3,
-    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 2,
     overflow: 'hidden',
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.ACCENT,
-    borderRadius: 2,
-  },
-  progressLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.ACCENT,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.TEXT_TERTIARY,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 8,
-  },
+  progressFill: { height: '100%', borderRadius: 2 },
+  progressLabel: { fontSize: 11 },
+  sectionLabel: { marginTop: spacing[5], marginBottom: spacing[2] },
 
   // Quest rows
   questRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    marginHorizontal: 16,
-    marginVertical: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.CARD_BORDER,
-  },
-  questRowPressed: {
-    backgroundColor: 'rgba(255,255,255,0.09)',
+    marginHorizontal: 20,
+    marginVertical: 6,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    borderRadius: radii.lg,
   },
   dayCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(20,184,166,0.15)',
     borderWidth: 1.5,
-    borderColor: 'rgba(20,184,166,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dayCircleCompleted: {
-    backgroundColor: 'rgba(20,184,166,0.25)',
-    borderColor: COLORS.ACCENT,
-  },
-  dayCircleLocked: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
   dayNumber: {
+    ...typography.meta,
+    fontFamily: fontFamily.sansSemiBold,
     fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.ACCENT,
-  },
-  dayNumberLocked: {
-    color: COLORS.TEXT_TERTIARY,
   },
   checkmark: {
     fontSize: 16,
-    color: COLORS.ACCENT,
-    fontWeight: '700',
+    fontFamily: fontFamily.sansBold,
   },
-  questInfo: {
-    flex: 1,
-    gap: 2,
-  },
+  questInfo: { flex: 1, minWidth: 0, gap: 2 },
+  questRef: { fontSize: 10 },
   questTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -0.2,
-  },
-  questTitleLocked: {
-    color: COLORS.TEXT_TERTIARY,
-  },
-  questArabic: {
-    fontFamily: 'AmiriQuran',
-    fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
-  },
-  questArabicLocked: {
-    color: 'rgba(148,163,184,0.4)',
-  },
-  chevron: {
-    fontSize: 22,
-    color: COLORS.TEXT_SECONDARY,
-    fontWeight: '300',
-  },
-  chevronLocked: {
-    fontSize: 14,
+    fontFamily: fontFamily.displayMedium,
+    fontSize: 17,
+    lineHeight: 21,
+    letterSpacing: -0.34,
+    color: palette.ink[25],
   },
 });

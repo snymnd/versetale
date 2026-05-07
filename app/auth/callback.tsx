@@ -1,15 +1,22 @@
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/ui';
+import { motion, palette, useColors } from '@/lib/theme';
 import { useAuthStore } from '@/features/auth/authStore';
-import { COLORS } from '@/lib/constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
+/**
+ * OAuth callback landing — the deep link returns here after the QF
+ * authorization sheet closes. Once the auth store flips to authenticated,
+ * redirect into the tabs.
+ */
 export default function AuthCallback() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { colors } = useColors();
 
   const rotation = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -17,7 +24,7 @@ export default function AuthCallback() {
   useEffect(() => {
     Animated.timing(opacity, {
       toValue: 1,
-      duration: 300,
+      duration: motion.duration.base,
       useNativeDriver: true,
     }).start();
 
@@ -41,10 +48,21 @@ export default function AuthCallback() {
   });
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={{ opacity }}>
-        <Animated.View style={[styles.spinner, { transform: [{ rotate: spin }] }]} />
-        <Text style={styles.label}>Signing you in…</Text>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      <Animated.View style={{ opacity, alignItems: 'center', gap: 16 }}>
+        <Animated.View
+          style={[
+            styles.spinner,
+            {
+              borderColor: 'rgba(31,122,132,0.2)',
+              borderTopColor: colors.brand,
+              transform: [{ rotate: spin }],
+            },
+          ]}
+        />
+        <Text variant="caption" tone="muted">
+          Signing you in…
+        </Text>
       </Animated.View>
     </View>
   );
@@ -53,25 +71,14 @@ export default function AuthCallback() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BG_DEEP,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
+    backgroundColor: palette.ink[950],
   },
   spinner: {
     width: 40,
     height: 40,
     borderRadius: 20,
     borderWidth: 3,
-    borderColor: 'rgba(20,184,166,0.2)',
-    borderTopColor: COLORS.ACCENT,
-    alignSelf: 'center',
-  },
-  label: {
-    color: COLORS.TEXT_SECONDARY,
-    fontSize: 15,
-    letterSpacing: 0.2,
-    textAlign: 'center',
-    marginTop: 4,
   },
 });

@@ -1,85 +1,102 @@
 import { router } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
 import { useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { COLORS } from '@/lib/constants';
+import { Button, Eyebrow, Text } from '@/components/ui';
+import { fontFamily, palette, spacing, useColors } from '@/lib/theme';
 
 const STEPS = [
   {
     number: '01',
     title: 'Choose a journey',
-    body: 'Pick a narrative from the Quran — a prophet\'s story, a chapter of trial, a promise fulfilled.',
+    body: "Pick a narrative — a prophet's story, a chapter of trial, a promise fulfilled.",
   },
   {
     number: '02',
-    title: 'One quest per day',
-    body: 'Each day unlocks a new quest: a short passage, a reflection prompt, and a question to sit with.',
+    title: 'One quest a day',
+    body: 'Each day unlocks a short passage, a reflection, and a question to sit with.',
   },
   {
     number: '03',
-    title: 'Track your path',
-    body: 'Your progress is saved. Return any day. Finish the story. Then begin the next.',
+    title: 'Walk the story',
+    body: 'Your progress saves itself. Return any day. Finish the arc. Then begin the next.',
   },
 ] as const;
 
 /**
  * Onboarding step 2 — explainer with numbered step cards.
- * Editorial layout: numbered left-rail, text right, accent connecting line.
  */
 export default function HowItWorksScreen() {
+  const { colors } = useColors();
+
   const handleContinue = useCallback(() => {
     router.push('/onboarding/pick-journey');
   }, []);
 
   const handleBack = useCallback(() => {
-    router.back();
+    if (router.canGoBack()) router.back();
+    else router.replace('/onboarding/welcome');
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable onPress={handleBack} accessibilityRole="button" accessibilityLabel="Go back">
-          <Text style={styles.backText}>← Back</Text>
+        <Pressable
+          onPress={handleBack}
+          style={[styles.iconBtn, { backgroundColor: colors.bgSunken }]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={8}
+        >
+          <ChevronLeft color={colors.fgMuted} size={20} strokeWidth={1.75} />
         </Pressable>
-        <Text style={styles.stepIndicator}>2 of 3</Text>
+        <Text variant="meta" tone="muted">
+          2 of 3
+        </Text>
       </View>
 
       <View style={styles.titleGroup}>
         <Text style={styles.title}>How it works</Text>
-        <Text style={styles.subtitle}>Simple by design. Meaningful by nature.</Text>
+        <Text variant="read" tone="muted" style={styles.subtitle}>
+          Simple by design. Meaningful by nature.
+        </Text>
       </View>
 
-      {/* Steps */}
       <View style={styles.steps}>
         {STEPS.map((step, index) => (
           <View key={step.number} style={styles.stepRow}>
-            {/* Number rail */}
             <View style={styles.numberRail}>
-              <View style={styles.numberCircle}>
-                <Text style={styles.numberText}>{step.number}</Text>
+              <View
+                style={[
+                  styles.numberCircle,
+                  { backgroundColor: 'rgba(31,122,132,0.16)', borderColor: 'rgba(31,122,132,0.4)' },
+                ]}
+              >
+                <Text style={[styles.numberText, { color: colors.brandFg }]}>{step.number}</Text>
               </View>
-              {index < STEPS.length - 1 && <View style={styles.connector} />}
+              {index < STEPS.length - 1 ? (
+                <View style={[styles.connector, { backgroundColor: 'rgba(31,122,132,0.18)' }]} />
+              ) : null}
             </View>
-
-            {/* Step content */}
             <View style={styles.stepContent}>
               <Text style={styles.stepTitle}>{step.title}</Text>
-              <Text style={styles.stepBody}>{step.body}</Text>
+              <Text variant="read" tone="muted" style={styles.stepBody}>
+                {step.body}
+              </Text>
             </View>
           </View>
         ))}
       </View>
 
       <View style={styles.footer}>
-        <Pressable
-          onPress={handleContinue}
-          style={({ pressed }) => [styles.ctaBtn, pressed && styles.ctaBtnPressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Choose your first journey"
-        >
-          <Text style={styles.ctaText}>Choose your journey</Text>
-        </Pressable>
+        <Eyebrow tone="subtle" style={styles.stepLabel}>
+          Step 2
+        </Eyebrow>
+        <Button variant="primary" size="lg" fullWidth onPress={handleContinue}>
+          Choose your journey
+        </Button>
       </View>
     </SafeAreaView>
   );
@@ -88,45 +105,39 @@ export default function HowItWorksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BG_DEEP,
     paddingHorizontal: 24,
-    paddingBottom: 32,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 32,
+    paddingVertical: spacing[2],
+    marginBottom: spacing[8],
   },
-  backText: {
-    fontSize: 15,
-    color: COLORS.TEXT_SECONDARY,
-    fontWeight: '500',
-  },
-  stepIndicator: {
-    fontSize: 12,
-    color: COLORS.TEXT_TERTIARY,
-    fontWeight: '500',
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   titleGroup: {
     gap: 6,
-    marginBottom: 40,
+    marginBottom: spacing[8],
   },
   title: {
+    fontFamily: fontFamily.displayMedium,
     fontSize: 36,
-    fontWeight: '800',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -1.2,
+    lineHeight: 40,
+    letterSpacing: -0.72,
+    color: palette.ink[25],
   },
   subtitle: {
     fontSize: 15,
-    color: COLORS.TEXT_SECONDARY,
     lineHeight: 22,
   },
   steps: {
     flex: 1,
-    gap: 0,
   },
   stepRow: {
     flexDirection: 'row',
@@ -140,60 +151,44 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(20,184,166,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.35)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   numberText: {
+    fontFamily: fontFamily.sansBold,
     fontSize: 13,
-    fontWeight: '800',
-    color: COLORS.ACCENT,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   connector: {
     flex: 1,
     width: 1,
-    backgroundColor: 'rgba(20,184,166,0.15)',
     marginVertical: 6,
     minHeight: 40,
   },
   stepContent: {
     flex: 1,
     paddingTop: 10,
-    paddingBottom: 32,
+    paddingBottom: spacing[8],
     gap: 6,
   },
   stepTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -0.3,
+    fontFamily: fontFamily.displayMedium,
+    fontSize: 19,
+    lineHeight: 24,
+    letterSpacing: -0.38,
+    color: palette.ink[25],
   },
   stepBody: {
-    fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 23,
   },
   footer: {
-    marginTop: 16,
+    paddingTop: spacing[4],
+    alignItems: 'stretch',
+    gap: spacing[3],
   },
-  ctaBtn: {
-    width: '100%',
-    backgroundColor: COLORS.ACCENT,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  ctaBtnPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
-  ctaText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.BG_DEEP,
-    letterSpacing: 0.2,
+  stepLabel: {
+    alignSelf: 'center',
   },
 });

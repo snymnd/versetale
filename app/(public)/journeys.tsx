@@ -1,21 +1,23 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useCallback } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { JourneyCard } from '@/components/ui/JourneyCard';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { SoftLoginBanner } from '@/components/ui/SoftLoginBanner';
-import { COLORS } from '@/lib/constants';
+import { Eyebrow, Text } from '@/components/ui';
+import { fontFamily, palette, spacing, useColors } from '@/lib/theme';
 import { useJourneys, type JourneySummary } from '@/features/journeys/useJourneys';
 
 /**
- * Public journey browse screen — same data as the authenticated tab index,
- * but no auth guard. Tapping a journey routes into the public journey detail.
- * A SoftLoginBanner nudges visitors to sign in for progress tracking.
+ * Public journeys catalog — same data as the authenticated tab index, no
+ * auth guard. A SoftLoginBanner nudges visitors to sign in for progress.
  */
 export default function PublicJourneysScreen() {
   const { data: journeys, isLoading, isError } = useJourneys();
+  const { colors } = useColors();
 
   const handleJourneyPress = useCallback((id: string) => {
     router.push(`/(public)/journey/${id}`);
@@ -28,93 +30,79 @@ export default function PublicJourneysScreen() {
     [handleJourneyPress],
   );
 
-  const renderEmpty = useCallback(() => {
-    if (isLoading) {
-      return (
-        <View style={styles.skeletonContainer}>
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </View>
-      );
-    }
-    if (isError) {
-      return (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Something went wrong</Text>
-          <Text style={styles.emptySubtext}>Could not load journeys. Please try again.</Text>
-        </View>
-      );
-    }
-    return (
-      <View style={styles.emptyState}>
-        <Text style={styles.emptyTitle}>No journeys yet</Text>
-        <Text style={styles.emptySubtext}>New journeys are on their way.</Text>
-      </View>
-    );
-  }, [isLoading, isError]);
-
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       <SoftLoginBanner />
 
       <FlashList
         data={journeys ?? []}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        ListEmptyComponent={renderEmpty}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Journey Library</Text>
-            <Text style={styles.headerSubtitle}>Choose your path through the Quran</Text>
+            <Eyebrow tone="muted">Library · Public preview</Eyebrow>
+            <Text style={[styles.title, { color: colors.fg }]}>Choose your path</Text>
+            <Text variant="read" tone="muted" style={styles.subtitle}>
+              Begin a story below. Sign in any time to keep your progress.
+            </Text>
           </View>
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <View>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </View>
+          ) : isError ? (
+            <View style={styles.empty}>
+              <Text variant="h4">Something went wrong</Text>
+              <Text variant="caption" tone="muted">
+                Could not load journeys. Pull to refresh.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <Text variant="h4">No journeys yet</Text>
+              <Text variant="caption" tone="muted">
+                New journeys are on their way.
+              </Text>
+            </View>
+          )
         }
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BG_DEEP,
-  },
+  container: { flex: 1 },
   header: {
-    paddingHorizontal: 4,
-    paddingTop: 20,
-    paddingBottom: 20,
-    gap: 4,
+    paddingTop: spacing[5],
+    paddingBottom: spacing[5],
+    gap: 6,
   },
-  headerTitle: {
+  title: {
+    fontFamily: fontFamily.displayMedium,
     fontSize: 30,
-    fontWeight: '800',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -1,
+    lineHeight: 36,
+    letterSpacing: -0.6,
+    color: palette.ink[25],
+    marginTop: 4,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 22,
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingBottom: 60,
   },
-  skeletonContainer: {
-    gap: 0,
-  },
-  emptyState: {
+  empty: {
     alignItems: 'center',
     paddingTop: 80,
     gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.TEXT_PRIMARY,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
   },
 });

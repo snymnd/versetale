@@ -1,9 +1,11 @@
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { COLORS, STALE_TIMES } from '@/lib/constants';
+import { Eyebrow, Text } from '@/components/ui';
+import { fontFamily, palette, radii, spacing, useColors } from '@/lib/theme';
+import { STALE_TIMES } from '@/lib/constants';
 
 const QDC_BASE = 'https://api.qurancdn.com/api/qdc';
 const IBN_KATHIR_ID = 169; // Ibn Kathir English
@@ -34,15 +36,20 @@ interface TafsirBottomSheetProps {
 }
 
 /**
- * TafsirBottomSheet — opened on long-press of a verse.
- * Fetches Ibn Kathir tafsir from Quran Foundation Content API.
- * Styled with dark luxury surface, teal handle, Arabic quote above tafsir text.
+ * Tafsir bottom sheet — opens on long-press of a verse. Uses the design
+ * system's `--radius-2xl` top-only radius and the `--brand-soft` surface
+ * for the Arabic quote echo.
  */
 export function TafsirBottomSheet({ verseKey, arabicText, onClose }: TafsirBottomSheetProps) {
+  const { colors } = useColors();
   const snapPoints = useMemo(() => ['50%', '90%'], []);
   const sheetRef = useRef<BottomSheet>(null);
 
-  const { data: tafsirText, isLoading, isError } = useQuery({
+  const {
+    data: tafsirText,
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ['tafsir', verseKey],
     queryFn: () => fetchTafsir(verseKey!),
     enabled: verseKey !== null,
@@ -71,43 +78,49 @@ export function TafsirBottomSheet({ verseKey, arabicText, onClose }: TafsirBotto
       snapPoints={snapPoints}
       onChange={handleSheetChange}
       enablePanDownToClose
-      backgroundStyle={styles.sheetBackground}
-      handleIndicatorStyle={styles.handleIndicator}
+      backgroundStyle={{
+        backgroundColor: colors.bgRaised,
+        borderTopLeftRadius: radii['2xl'],
+        borderTopRightRadius: radii['2xl'],
+      }}
+      handleIndicatorStyle={{ backgroundColor: colors.brand, width: 40, height: 4 }}
     >
       <BottomSheetScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header row */}
         <View style={styles.header}>
-          <Text style={styles.headerLabel}>Tafsir · Ibn Kathir</Text>
-          <Text style={styles.verseKeyLabel}>{verseKey}</Text>
+          <Eyebrow tone="brand">A note · Ibn Kathīr</Eyebrow>
+          <Text variant="mono" tone="muted">
+            {verseKey}
+          </Text>
         </View>
 
-        {/* Arabic quote */}
         {arabicText ? (
-          <View style={styles.arabicQuoteCard}>
-            <Text style={styles.arabicQuote} accessibilityLanguage="ar">
+          <View style={[styles.arabicQuoteCard, { backgroundColor: colors.brandSoft }]}>
+            <Text style={[styles.arabicQuote, { color: colors.fg }]} accessibilityLanguage="ar">
               {arabicText}
             </Text>
           </View>
         ) : null}
 
-        {/* Divider */}
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: colors.divider }]} />
 
-        {/* Tafsir body */}
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator color={COLORS.ACCENT} size="small" />
-            <Text style={styles.loadingText}>Loading tafsir…</Text>
+            <ActivityIndicator color={colors.brand} size="small" />
+            <Text variant="caption" tone="muted">
+              Loading tafsir…
+            </Text>
           </View>
         ) : isError ? (
-          <Text style={styles.errorText}>
-            Could not load tafsir. Please check your connection.
+          <Text variant="read" style={styles.errorText}>
+            Could not load tafsir. Check your connection and try again.
           </Text>
         ) : (
-          <Text style={styles.tafsirText}>{tafsirText}</Text>
+          <Text variant="read" tone="muted" style={styles.tafsirText}>
+            {tafsirText}
+          </Text>
         )}
       </BottomSheetScrollView>
     </BottomSheet>
@@ -115,18 +128,6 @@ export function TafsirBottomSheet({ verseKey, arabicText, onClose }: TafsirBotto
 }
 
 const styles = StyleSheet.create({
-  sheetBackground: {
-    backgroundColor: '#131C30',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.15)',
-  },
-  handleIndicator: {
-    backgroundColor: COLORS.ACCENT,
-    width: 40,
-    height: 4,
-  },
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 40,
@@ -135,62 +136,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 16,
-    paddingBottom: 12,
-  },
-  headerLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.ACCENT,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  verseKeyLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.TEXT_SECONDARY,
-    fontVariant: ['tabular-nums'],
+    paddingTop: spacing[4],
+    paddingBottom: spacing[3],
   },
   arabicQuoteCard: {
-    backgroundColor: 'rgba(20,184,166,0.07)',
-    borderRadius: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.ACCENT,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 16,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[4],
+    marginBottom: spacing[4],
   },
   arabicQuote: {
     fontFamily: 'AmiriQuran',
     fontSize: 22,
-    color: COLORS.TEXT_PRIMARY,
     textAlign: 'right',
     writingDirection: 'rtl',
-    lineHeight: 38,
+    lineHeight: 40,
+    color: palette.ink[25],
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.CARD_BORDER,
-    marginBottom: 18,
+    marginBottom: spacing[5],
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingTop: 8,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
+    paddingTop: spacing[2],
   },
   errorText: {
-    fontSize: 14,
-    color: '#EF4444',
-    lineHeight: 22,
+    fontFamily: fontFamily.sans,
+    fontSize: 15,
   },
   tafsirText: {
-    fontSize: 15,
-    color: COLORS.TEXT_SECONDARY,
-    lineHeight: 26,
+    fontSize: 16,
+    lineHeight: 27,
   },
 });

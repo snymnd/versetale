@@ -1,40 +1,47 @@
 import { router } from 'expo-router';
+import { X } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { COLORS } from '@/lib/constants';
+import { Button, Text } from '@/components/ui';
+import { spacing, useColors } from '@/lib/theme';
 
 /**
- * SoftLoginBanner — a slim horizontal strip prompting unauthenticated users to sign in.
- * Dismissible via the X button (local state, does not persist across navigation).
- * Designed to be placed at the top of a screen or pinned above a player bar.
+ * SoftLoginBanner — slim strip prompting unauthenticated visitors to sign
+ * in for progress tracking. Dismissible via the close icon (local state
+ * only, does not persist).
  */
 export function SoftLoginBanner() {
   const [dismissed, setDismissed] = useState(false);
+  const { colors } = useColors();
 
   if (dismissed) return null;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.accentBar} />
-      <Text style={styles.message} numberOfLines={1}>
-        Sign in to save your progress &amp; notes
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.brandSoft,
+          borderBottomColor: colors.border,
+        },
+      ]}
+    >
+      <View style={[styles.accentBar, { backgroundColor: colors.brand }]} />
+      <Text variant="caption" tone="brand" style={styles.message} numberOfLines={1}>
+        Sign in to save your progress & reflections.
       </Text>
-      <Pressable
-        onPress={() => router.push('/(auth)/login')}
-        accessibilityRole="button"
-        accessibilityLabel="Sign in"
-        style={({ pressed }) => [styles.signInBtn, pressed && styles.signInBtnPressed]}
-      >
-        <Text style={styles.signInText}>Sign In</Text>
-      </Pressable>
+      <Button variant="primary" size="sm" onPress={() => router.push('/(auth)/login')}>
+        Sign in
+      </Button>
       <Pressable
         onPress={() => setDismissed(true)}
         accessibilityRole="button"
         accessibilityLabel="Dismiss banner"
-        style={({ pressed }) => [styles.dismissBtn, pressed && styles.dismissBtnPressed]}
+        hitSlop={8}
+        style={[styles.dismissBtn, { backgroundColor: colors.bgSunken }]}
       >
-        <Text style={styles.dismissIcon}>✕</Text>
+        <X size={12} color={colors.fgMuted} strokeWidth={2} />
       </Pressable>
     </View>
   );
@@ -44,55 +51,26 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.BG_SURFACE,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.CARD_BORDER,
-    paddingVertical: 10,
-    paddingRight: 12,
+    paddingVertical: spacing[2],
+    paddingRight: spacing[3],
     gap: 10,
+    borderBottomWidth: 1,
   },
   accentBar: {
     width: 3,
     alignSelf: 'stretch',
-    backgroundColor: COLORS.ACCENT,
     borderRadius: 2,
-    marginLeft: 0,
   },
   message: {
     flex: 1,
     fontSize: 13,
-    color: COLORS.TEXT_SECONDARY,
-    paddingLeft: 10,
-  },
-  signInBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    backgroundColor: COLORS.ACCENT,
-    borderRadius: 20,
-  },
-  signInBtnPressed: {
-    opacity: 0.82,
-  },
-  signInText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0A0F1E',
-    letterSpacing: 0.2,
+    paddingLeft: spacing[2],
   },
   dismissBtn: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  dismissBtnPressed: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  dismissIcon: {
-    fontSize: 11,
-    color: COLORS.TEXT_TERTIARY,
-    fontWeight: '600',
+    borderRadius: 13,
   },
 });

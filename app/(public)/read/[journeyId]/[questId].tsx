@@ -1,15 +1,17 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BismillahHeader } from '@/components/reader/BismillahHeader';
 import { MiniAudioPlayer } from '@/components/reader/MiniAudioPlayer';
 import { TafsirBottomSheet } from '@/components/reader/TafsirBottomSheet';
 import { VerseBlock } from '@/components/reader/VerseBlock';
+import { Eyebrow, Text } from '@/components/ui';
 import { SoftLoginBanner } from '@/components/ui/SoftLoginBanner';
-import { COLORS } from '@/lib/constants';
+import { fontFamily, spacing, useColors } from '@/lib/theme';
 import { useJourneyDetail } from '@/features/journeys/useJourneyDetail';
 import { useQuestProgressStore } from '@/features/journeys/journeyStore';
 import { useVersesByRange } from '@/features/reader/useVerses';
@@ -17,10 +19,6 @@ import type { Verse } from '@/features/reader/types';
 
 type ListItem = { type: 'bismillah' } | { type: 'verse'; verse: Verse };
 
-/**
- * Derives the surah number and min/max verse numbers from a list of verse keys.
- * Assumes all verse keys belong to the same surah (e.g. ["12:4","12:5","12:6"]).
- */
 function parseVerseRange(verseKeys: string[]): { surah: number; from: number; to: number } | null {
   if (verseKeys.length === 0) return null;
   const parsed = verseKeys.map((key) => {
@@ -33,12 +31,12 @@ function parseVerseRange(verseKeys: string[]): { surah: number; from: number; to
 }
 
 /**
- * Public reader screen — full verse experience with audio.
- * No progress saving, no reflection prompt.
- * SoftLoginBanner is pinned above the audio player.
+ * Public reader screen — full verse experience with audio. No progress
+ * saving, no reflection prompt. SoftLoginBanner sits above the player.
  */
 export default function PublicReaderScreen() {
   const { journeyId, questId } = useLocalSearchParams<{ journeyId: string; questId: string }>();
+  const { colors } = useColors();
 
   const { data: journey, isLoading: journeyLoading } = useJourneyDetail(journeyId);
   const quest = journey?.quests.find((q) => q.id === questId);
@@ -59,9 +57,7 @@ export default function PublicReaderScreen() {
   const [tafsirArabic, setTafsirArabic] = useState<string>('');
 
   const handleVersePress = useCallback(
-    (verse: Verse) => {
-      setCurrentVerse(verse.verseKey);
-    },
+    (verse: Verse) => setCurrentVerse(verse.verseKey),
     [setCurrentVerse],
   );
 
@@ -69,6 +65,11 @@ export default function PublicReaderScreen() {
     setTafsirVerseKey(verse.verseKey);
     setTafsirArabic(verse.textUthmani);
   }, []);
+
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace(`/(public)/journey/${journeyId}`);
+  }, [journeyId]);
 
   const audioMap = useMemo<Record<string, string | null>>(() => {
     if (!verses) return {};
@@ -111,34 +112,43 @@ export default function PublicReaderScreen() {
   );
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: colors.bg }]}>
       <SafeAreaView style={styles.container} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            { backgroundColor: colors.bg, borderBottomColor: colors.border },
+          ]}
+        >
           <Pressable
-            onPress={() => router.back()}
-            style={styles.backBtn}
+            onPress={handleBack}
+            style={[styles.iconBtn, { backgroundColor: colors.bgSunken }]}
+            accessibilityRole="button"
             accessibilityLabel="Go back"
+            hitSlop={8}
           >
-            <Text style={styles.backIcon}>{'←'}</Text>
+            <ChevronLeft color={colors.fgMuted} size={20} strokeWidth={1.75} />
           </Pressable>
           <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>{quest?.title ?? '—'}</Text>
-            <Text style={styles.headerSubtitle}>
+            <Eyebrow>
               Day {questDay} of {totalQuests}
+            </Eyebrow>
+            <Text style={[styles.headerTitle, { color: colors.fg }]} numberOfLines={1}>
+              {quest?.title ?? '—'}
             </Text>
           </View>
-          {/* Spacer to balance the back button */}
-          <View style={styles.headerSpacer} />
+          <View style={styles.iconBtn} />
         </View>
 
         {isLoading ? (
           <View style={styles.centered}>
-            <ActivityIndicator color={COLORS.ACCENT} />
+            <ActivityIndicator color={colors.brand} />
           </View>
         ) : isError ? (
           <View style={styles.centered}>
-            <Text style={styles.errorText}>Could not load verses.</Text>
+            <Text variant="caption" tone="muted">
+              Could not load verses.
+            </Text>
           </View>
         ) : (
           <FlashList
@@ -153,20 +163,18 @@ export default function PublicReaderScreen() {
         )}
       </SafeAreaView>
 
-      {/* Bottom bar — banner stacked above audio player */}
       <View style={styles.bottomBar}>
         <SoftLoginBanner />
-        {verseKeys.length > 0 && (
+        {verseKeys.length > 0 ? (
           <MiniAudioPlayer
             verseKeys={verseKeys}
             audioMap={audioMap}
-            reciterName="Mishary Rashid"
+            reciterName="Mishary Rāshid al-ʿAfāsy"
             containerStyle={styles.playerContained}
           />
-        )}
+        ) : null}
       </View>
 
-      {/* Tafsir bottom sheet */}
       <TafsirBottomSheet
         verseKey={tafsirVerseKey}
         arabicText={tafsirArabic}
@@ -177,42 +185,27 @@ export default function PublicReaderScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.BG_DEEP,
-  },
-  container: {
-    flex: 1,
-  },
+  root: { flex: 1 },
+  container: { flex: 1 },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  errorText: {
-    fontSize: 15,
-    color: COLORS.TEXT_SECONDARY,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: spacing[3],
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.CARD_BORDER,
   },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 18,
   },
   headerCenter: {
     flex: 1,
@@ -220,21 +213,14 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   headerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -0.2,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: COLORS.TEXT_SECONDARY,
-  },
-  headerSpacer: {
-    width: 36,
+    fontFamily: fontFamily.displayMedium,
+    fontSize: 16,
+    lineHeight: 20,
+    letterSpacing: -0.32,
   },
   listContent: {
-    paddingTop: 8,
-    paddingBottom: 20,
+    paddingTop: spacing[3],
+    paddingBottom: 180,
   },
   bottomBar: {
     position: 'absolute',

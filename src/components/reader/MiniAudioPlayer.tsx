@@ -13,7 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useQuestProgressStore } from '@/features/journeys/journeyStore';
-import { COLORS } from '@/lib/constants';
+import { fontFamily, palette, radii, useColors } from '@/lib/theme';
 
 interface MiniAudioPlayerProps {
   verseKeys: string[];
@@ -46,13 +46,21 @@ function AudioControls({
   onPrev,
   onNext,
 }: AudioControlsProps) {
+  const { colors, shadow } = useColors();
+
   return (
-    <View style={styles.inner}>
+    <View
+      style={[
+        styles.inner,
+        shadow.lg,
+        { backgroundColor: colors.bgRaised, borderColor: colors.border },
+      ]}
+    >
       <View style={styles.info}>
-        <Text style={styles.reciterName} numberOfLines={1}>
+        <Text style={[styles.reciterName, { color: colors.brandFg }]} numberOfLines={1}>
           {reciterName}
         </Text>
-        <Text style={styles.verseKey} numberOfLines={1}>
+        <Text style={[styles.verseKey, { color: colors.fgMuted }]} numberOfLines={1}>
           {currentVerseKey ?? '—'}
         </Text>
       </View>
@@ -62,15 +70,28 @@ function AudioControls({
           onPress={onPrev}
           disabled={!canPrev}
           accessibilityLabel="Previous verse"
-          style={({ pressed }) => [styles.controlBtn, pressed && styles.controlBtnPressed]}
+          style={({ pressed }) => [
+            styles.controlBtn,
+            { backgroundColor: pressed ? colors.bgMuted : colors.bgSunken },
+          ]}
         >
-          <Text style={[styles.controlIcon, !canPrev && styles.controlDisabled]}>{'«'}</Text>
+          <Text
+            style={[
+              styles.controlIcon,
+              { color: canPrev ? colors.fgMuted : colors.fgSubtle },
+            ]}
+          >
+            {'«'}
+          </Text>
         </Pressable>
 
         <Pressable
           onPress={onPlayPause}
           accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
-          style={({ pressed }) => [styles.playBtn, pressed && styles.playBtnPressed]}
+          style={({ pressed }) => [
+            styles.playBtn,
+            { backgroundColor: colors.brand, opacity: pressed ? 0.85 : 1 },
+          ]}
         >
           <Text style={styles.playIcon}>{isLoading ? '…' : isPlaying ? '⏸' : '▶'}</Text>
         </Pressable>
@@ -79,9 +100,19 @@ function AudioControls({
           onPress={onNext}
           disabled={!canNext}
           accessibilityLabel="Next verse"
-          style={({ pressed }) => [styles.controlBtn, pressed && styles.controlBtnPressed]}
+          style={({ pressed }) => [
+            styles.controlBtn,
+            { backgroundColor: pressed ? colors.bgMuted : colors.bgSunken },
+          ]}
         >
-          <Text style={[styles.controlIcon, !canNext && styles.controlDisabled]}>{'»'}</Text>
+          <Text
+            style={[
+              styles.controlIcon,
+              { color: canNext ? colors.fgMuted : colors.fgSubtle },
+            ]}
+          >
+            {'»'}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -423,35 +454,26 @@ const styles = StyleSheet.create({
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A2540',
-    borderRadius: 14,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.25)',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 12,
   },
   info: {
     flex: 1,
     gap: 2,
   },
   reciterName: {
+    fontFamily: fontFamily.sansSemiBold,
     fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.ACCENT,
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
   verseKey: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -0.2,
+    fontFamily: fontFamily.mono,
+    fontSize: 13,
+    letterSpacing: 0,
   },
   controls: {
     flexDirection: 'row',
@@ -464,37 +486,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  controlBtnPressed: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   controlIcon: {
     fontSize: 16,
-    color: COLORS.TEXT_SECONDARY,
-    fontWeight: '700',
-  },
-  controlDisabled: {
-    color: COLORS.TEXT_TERTIARY,
+    fontFamily: fontFamily.sansSemiBold,
   },
   playBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.ACCENT,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: COLORS.ACCENT,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  playBtnPressed: {
-    opacity: 0.8,
   },
   playIcon: {
     fontSize: 16,
-    color: '#0A0F1E',
+    color: palette.ink[0],
   },
 });

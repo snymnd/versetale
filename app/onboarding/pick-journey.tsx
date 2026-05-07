@@ -1,25 +1,30 @@
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
 import { useCallback } from 'react';
-import { StyleSheet, Text, View, Pressable } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { JourneyCard } from '@/components/ui/JourneyCard';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
-import { COLORS } from '@/lib/constants';
-import { useJourneys, type JourneySummary } from '@/features/journeys/useJourneys';
+import { Text } from '@/components/ui';
+import { fontFamily, palette, spacing, useColors } from '@/lib/theme';
 import { useAuthStore } from '@/features/auth/authStore';
+import { useJourneys, type JourneySummary } from '@/features/journeys/useJourneys';
 
 /**
- * Onboarding step 3 — journey catalog.
- * Selecting a journey checks authentication, then routes accordingly.
+ * Onboarding step 3 — journey catalog. Selecting a journey routes
+ * authenticated users to the tabs and unauthenticated visitors to login
+ * with the chosen journey id pinned to params.
  */
 export default function PickJourneyScreen() {
   const { data: journeys, isLoading } = useJourneys();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { colors } = useColors();
 
   const handleBack = useCallback(() => {
-    router.back();
+    if (router.canGoBack()) router.back();
+    else router.replace('/onboarding/welcome');
   }, []);
 
   const handleJourneySelect = useCallback(
@@ -27,7 +32,6 @@ export default function PickJourneyScreen() {
       if (isAuthenticated) {
         router.replace('/(tabs)');
       } else {
-        // Store the selected journey in URL state so login can redirect back
         router.push({ pathname: '/(auth)/login', params: { returnJourney: id } });
       }
     },
@@ -42,27 +46,38 @@ export default function PickJourneyScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={handleBack} accessibilityRole="button" accessibilityLabel="Go back">
-          <Text style={styles.backText}>← Back</Text>
+        <Pressable
+          onPress={handleBack}
+          style={[styles.iconBtn, { backgroundColor: colors.bgSunken }]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={8}
+        >
+          <ChevronLeft color={colors.fgMuted} size={20} strokeWidth={1.75} />
         </Pressable>
-        <Text style={styles.stepIndicator}>3 of 3</Text>
+        <Text variant="meta" tone="muted">
+          3 of 3
+        </Text>
       </View>
 
       <View style={styles.titleGroup}>
         <Text style={styles.title}>Pick your first journey</Text>
-        <Text style={styles.subtitle}>You can start another one any time.</Text>
+        <Text variant="read" tone="muted" style={styles.subtitle}>
+          You can start another one any time.
+        </Text>
       </View>
 
       {isLoading ? (
-        <View style={styles.skeletonContainer}>
+        <View>
           <SkeletonCard />
           <SkeletonCard />
         </View>
       ) : (
         <FlashList
           data={journeys ?? []}
+          keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -75,44 +90,38 @@ export default function PickJourneyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BG_DEEP,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 24,
+    paddingVertical: spacing[2],
+    marginBottom: spacing[6],
   },
-  backText: {
-    fontSize: 15,
-    color: COLORS.TEXT_SECONDARY,
-    fontWeight: '500',
-  },
-  stepIndicator: {
-    fontSize: 12,
-    color: COLORS.TEXT_TERTIARY,
-    fontWeight: '500',
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   titleGroup: {
     gap: 4,
-    marginBottom: 24,
+    marginBottom: spacing[5],
   },
   title: {
+    fontFamily: fontFamily.displayMedium,
     fontSize: 30,
-    fontWeight: '800',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -1,
+    lineHeight: 36,
+    letterSpacing: -0.6,
+    color: palette.ink[25],
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
-  },
-  skeletonContainer: {
-    paddingHorizontal: 0,
+    lineHeight: 21,
   },
   listContent: {
-    paddingBottom: 32,
+    paddingBottom: 60,
   },
 });

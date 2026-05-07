@@ -1,48 +1,42 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { COLORS } from '@/lib/constants';
+import { Divider } from '@/components/brand';
+import { spacing, useColors } from '@/lib/theme';
 
 /**
  * BismillahHeader — shown only on quest day 1 (the first quest of a journey).
- * Displays the Bismillah in Arabic centered above the verse list.
+ * Uses the design system's chapter-break divider as a frame around the
+ * Bismillah set in Amiri.
  */
 export function BismillahHeader() {
+  const { colors } = useColors();
   return (
     <View style={styles.container}>
-      <View style={styles.dividerLeft} />
-      <Text style={styles.text} accessibilityLabel="Bismillah ir-rahman ir-rahim">
+      <Divider color={colors.divider} />
+      <Text
+        style={[styles.text, { color: colors.fgMuted }]}
+        accessibilityLabel="Bismillah ir-rahman ir-rahim"
+      >
         بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
       </Text>
-      <View style={styles.dividerRight} />
+      <Divider color={colors.divider} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 8,
-    marginBottom: 24,
-    gap: 12,
-  },
-  dividerLeft: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.CARD_BORDER,
-  },
-  dividerRight: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.CARD_BORDER,
+    marginHorizontal: 32,
+    marginTop: spacing[3],
+    marginBottom: spacing[6],
+    gap: spacing[3],
   },
   text: {
     fontFamily: 'AmiriQuran',
-    fontSize: 22,
-    color: COLORS.TEXT_SECONDARY,
+    fontSize: 24,
+    lineHeight: 44,
     textAlign: 'center',
     writingDirection: 'rtl',
-    flexShrink: 1,
   },
 });

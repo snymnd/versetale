@@ -1,17 +1,19 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Bookmark, ChevronLeft } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { COLORS } from '@/lib/constants';
-import { useJourneyDetail } from '@/features/journeys/useJourneyDetail';
-import { useVersesByRange } from '@/features/reader/useVerses';
-import { useQuestProgressStore } from '@/features/journeys/journeyStore';
+import { Button, Eyebrow, Text } from '@/components/ui';
 import { BismillahHeader } from '@/components/reader/BismillahHeader';
-import { VerseBlock } from '@/components/reader/VerseBlock';
-import { TafsirBottomSheet } from '@/components/reader/TafsirBottomSheet';
 import { MiniAudioPlayer } from '@/components/reader/MiniAudioPlayer';
+import { TafsirBottomSheet } from '@/components/reader/TafsirBottomSheet';
+import { VerseBlock } from '@/components/reader/VerseBlock';
+import { fontFamily, spacing, useColors } from '@/lib/theme';
+import { useJourneyDetail } from '@/features/journeys/useJourneyDetail';
+import { useQuestProgressStore } from '@/features/journeys/journeyStore';
+import { useVersesByRange } from '@/features/reader/useVerses';
 import type { Verse } from '@/features/reader/types';
 
 type ListItem =
@@ -34,22 +36,18 @@ function parseVerseRange(verseKeys: string[]): { surah: number; from: number; to
 }
 
 /**
- * Reader screen — scrollable verse list for one quest day.
- * Shows BismillahHeader on day 1.
- * Highlights the currently playing verse.
- * Long-press on a verse opens TafsirBottomSheet.
- * MiniAudioPlayer is rendered here so it sits above the tab bar within the reader stack.
+ * Reader — verse-by-verse view for one quest day. Sticky header sits over
+ * the page with a hairline progress bar; long-press on a verse opens the
+ * Tafsir sheet; the floating MiniAudioPlayer hovers above the tab bar.
  */
 export default function ReaderScreen() {
   const { journeyId, questId } = useLocalSearchParams<{ journeyId: string; questId: string }>();
+  const { colors } = useColors();
 
   const { data: journey, isLoading: journeyLoading } = useJourneyDetail(journeyId);
   const quest = journey?.quests.find((q) => q.id === questId);
 
-  const range = useMemo(
-    () => parseVerseRange(quest?.verseKeys ?? []),
-    [quest?.verseKeys],
-  );
+  const range = useMemo(() => parseVerseRange(quest?.verseKeys ?? []), [quest?.verseKeys]);
 
   const reciterId = useQuestProgressStore((s) => s.reciterId);
   const currentVerseKey = useQuestProgressStore((s) => s.currentVerseKey);
@@ -61,12 +59,7 @@ export default function ReaderScreen() {
     data: verses,
     isLoading: versesLoading,
     isError,
-  } = useVersesByRange(
-    range?.surah ?? 0,
-    range?.from ?? 0,
-    range?.to ?? 0,
-    reciterId,
-  );
+  } = useVersesByRange(range?.surah ?? 0, range?.from ?? 0, range?.to ?? 0, reciterId);
 
   // Tafsir sheet state
   const [tafsirVerseKey, setTafsirVerseKey] = useState<string | null>(null);
@@ -85,9 +78,6 @@ export default function ReaderScreen() {
   }, []);
 
   const handleBack = useCallback(() => {
-    // Reset audio state before leaving so playback stops immediately.
-    // Always replace to journey detail — reader/journey/index are all Tabs.Screen
-    // entries so router.back() skips past journey detail to the tab root.
     setCurrentVerse(null);
     setPlaying(false);
     router.replace(`/(tabs)/journey/${journeyId}`);
@@ -122,7 +112,7 @@ export default function ReaderScreen() {
 
   const totalQuests = journey?.quests.length ?? 0;
   const questDay = quest?.day ?? 1;
-
+  const progressFraction = totalQuests > 0 ? questDay / totalQuests : 0;
   const isLoading = journeyLoading || versesLoading;
 
   const renderItem = useCallback(
@@ -145,56 +135,75 @@ export default function ReaderScreen() {
   );
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: colors.bg }]}>
       <SafeAreaView style={styles.container} edges={['top']}>
-        {/* Header */}
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            { backgroundColor: colors.bg, borderBottomColor: colors.border },
+          ]}
+        >
           <Pressable
-            onPress={() => handleBack()}
-            style={styles.backBtn}
+            onPress={handleBack}
+            style={[styles.iconBtn, { backgroundColor: colors.bgSunken }]}
+            accessibilityRole="button"
             accessibilityLabel="Go back"
+            hitSlop={8}
           >
-            <Text style={styles.backIcon}>{'←'}</Text>
+            <ChevronLeft color={colors.fgMuted} size={20} strokeWidth={1.75} />
           </Pressable>
           <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>{quest?.title ?? '—'}</Text>
-            <Text style={styles.headerSubtitle}>
+            <Eyebrow>
               Day {questDay} of {totalQuests}
+            </Eyebrow>
+            <Text style={[styles.headerTitle, { color: colors.fg }]} numberOfLines={1}>
+              {quest?.title ?? '—'}
             </Text>
           </View>
           <Pressable
-            onPress={handleQuestComplete}
-            style={styles.completeBtn}
-            accessibilityLabel="Complete quest"
+            style={[styles.iconBtn, { backgroundColor: colors.bgSunken }]}
+            accessibilityRole="button"
+            accessibilityLabel="Bookmark this quest"
+            hitSlop={8}
           >
-            <Text style={styles.completeBtnText}>Done</Text>
+            <Bookmark color={colors.fgMuted} size={18} strokeWidth={1.75} />
           </Pressable>
+        </View>
+        <View style={[styles.progressTrack, { backgroundColor: colors.bgMuted }]}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${progressFraction * 100}%`, backgroundColor: colors.brand },
+            ]}
+          />
         </View>
 
         {isLoading ? (
           <View style={styles.centered}>
-            <ActivityIndicator color={COLORS.ACCENT} />
-            <Text style={styles.loadingText}>Loading verses…</Text>
+            <ActivityIndicator color={colors.brand} />
+            <Text variant="caption" tone="muted" style={styles.loadingText}>
+              Loading verses…
+            </Text>
           </View>
         ) : isError ? (
           <View style={styles.centered}>
-            <Text style={styles.emptyIcon}>⚠️</Text>
-            <Text style={styles.emptyTitle}>Couldn't load verses</Text>
-            <Text style={styles.errorText}>Check your connection and try again.</Text>
-            <Pressable onPress={() => handleBack()} style={styles.backLink}>
-              <Text style={styles.backLinkText}>← Back to journey</Text>
-            </Pressable>
+            <Text variant="h4">Couldn't load verses</Text>
+            <Text variant="caption" tone="muted" style={styles.errorCaption}>
+              Check your connection and try again.
+            </Text>
+            <Button variant="ghost" onPress={handleBack} style={styles.errorAction}>
+              ← Back to journey
+            </Button>
           </View>
         ) : listItems.length === 0 ? (
           <View style={styles.centered}>
-            <Text style={styles.emptyIcon}>📜</Text>
-            <Text style={styles.emptyTitle}>No verses assigned</Text>
-            <Text style={styles.errorText}>
+            <Text variant="h4">No verses assigned</Text>
+            <Text variant="caption" tone="muted" style={styles.errorCaption}>
               This quest doesn't have any verses yet. Check back soon.
             </Text>
-            <Pressable onPress={() => handleBack()} style={styles.backLink}>
-              <Text style={styles.backLinkText}>← Back to journey</Text>
-            </Pressable>
+            <Button variant="ghost" onPress={handleBack} style={styles.errorAction}>
+              ← Back to journey
+            </Button>
           </View>
         ) : (
           <FlashList
@@ -205,6 +214,13 @@ export default function ReaderScreen() {
             renderItem={renderItem}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
+            ListFooterComponent={
+              <View style={styles.completeRow}>
+                <Button variant="primary" size="lg" fullWidth onPress={handleQuestComplete}>
+                  Continue to reflection
+                </Button>
+              </View>
+            }
           />
         )}
       </SafeAreaView>
@@ -214,7 +230,7 @@ export default function ReaderScreen() {
         <MiniAudioPlayer
           verseKeys={verseKeys}
           audioMap={audioMap}
-          reciterName="Mishary Rashid"
+          reciterName="Mishary Rāshid al-ʿAfāsy"
           onComplete={handleQuestComplete}
         />
       )}
@@ -230,73 +246,22 @@ export default function ReaderScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.BG_DEEP,
-  },
-  container: {
-    flex: 1,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 32,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
-    marginTop: 8,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.TEXT_PRIMARY,
-    textAlign: 'center',
-  },
-  errorText: {
-    fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
-    textAlign: 'center',
-  },
-  backLink: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.CARD_BORDER,
-  },
-  backLinkText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.ACCENT,
-  },
+  root: { flex: 1 },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: spacing[3],
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.CARD_BORDER,
   },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    color: COLORS.TEXT_PRIMARY,
-    fontSize: 18,
   },
   headerCenter: {
     flex: 1,
@@ -304,30 +269,36 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   headerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -0.2,
+    fontFamily: fontFamily.displayMedium,
+    fontSize: 16,
+    lineHeight: 20,
+    letterSpacing: -0.32,
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: COLORS.TEXT_SECONDARY,
+  progressTrack: {
+    height: 3,
+    marginHorizontal: 20,
+    marginBottom: spacing[2],
+    borderRadius: 2,
+    overflow: 'hidden',
   },
-  completeBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(20,184,166,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.35)',
-    borderRadius: 20,
+  progressFill: { height: '100%' },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 32,
   },
-  completeBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.ACCENT,
-  },
+  loadingText: { marginTop: 8 },
+  errorCaption: { textAlign: 'center' },
+  errorAction: { marginTop: 8 },
   listContent: {
-    paddingTop: 8,
-    paddingBottom: 120,
+    paddingTop: spacing[3],
+    paddingBottom: 180,
+  },
+  completeRow: {
+    paddingHorizontal: 20,
+    paddingTop: spacing[5],
+    alignItems: 'stretch',
   },
 });

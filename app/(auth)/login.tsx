@@ -1,10 +1,16 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { COLORS } from '@/lib/constants';
+import { HeroDusk, LogoMark } from '@/components/brand';
+import { Button, Eyebrow, Text } from '@/components/ui';
+import { fontFamily, palette, spacing } from '@/lib/theme';
 import { useAuth } from '@/features/auth/useAuth';
 
+/**
+ * Login — full-bleed dusk hero with the brand logomark, an editorial
+ * Fraunces headline, and a single primary CTA. Secondary action drops
+ * the user into a public preview if Quran Foundation auth fails.
+ */
 export default function LoginScreen() {
   const { login, isLoading } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -12,142 +18,88 @@ export default function LoginScreen() {
   const busy = isLoading || isSigningIn;
 
   const handleLogin = useCallback(async () => {
-    if (busy) {
-      console.log('[login] already signing in — ignoring tap');
-      return;
-    }
-    console.log('[login] starting OAuth flow…');
+    if (busy) return;
     setIsSigningIn(true);
     try {
       await login();
-      console.log('[login] OAuth flow finished');
-    } catch (err) {
-      console.error('[login] OAuth flow failed:', err);
     } finally {
       setIsSigningIn(false);
     }
   }, [login, busy]);
 
   return (
-    <LinearGradient
-      colors={[COLORS.BG_DEEP, COLORS.BG_SURFACE]}
-      style={styles.container}
-    >
-      {/* Decorative accent blob */}
-      <View style={styles.accentBlob} />
-
+    <HeroDusk style={styles.container}>
       <View style={styles.content}>
         <View style={styles.logoArea}>
-          <Text style={styles.appName}>VerseTale</Text>
-          <Text style={styles.tagline}>One Story. One Day. One Verse.</Text>
+          <LogoMark size={72} />
+          <Text style={styles.appName} color={palette.ink[0]}>
+            VerseTale
+          </Text>
+          <Eyebrow color="rgba(255,255,255,0.7)">One story · one day · one verse</Eyebrow>
         </View>
 
         <View style={styles.cta}>
-          <Text style={styles.heading}>Begin your journey</Text>
-          <Text style={styles.subheading}>
-            Sign in with your Quran Foundation account to track your progress across all journeys.
+          <Text style={styles.heading} color={palette.ink[0]}>
+            Begin your journey.
+          </Text>
+          <Text style={styles.subheading} color="rgba(236,239,242,0.78)">
+            Sign in with your Quran Foundation account to keep your progress, reflections, and
+            reading streak across devices.
           </Text>
 
-          <Pressable
+          <Button
+            variant="onDark"
+            size="lg"
+            fullWidth
+            loading={busy}
             onPress={handleLogin}
-            disabled={busy}
-            style={({ pressed }) => [
-              styles.signInBtn,
-              pressed && !busy && styles.signInBtnPressed,
-              busy && styles.signInBtnDisabled,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Sign in to VerseTale"
-            accessibilityState={{ busy, disabled: busy }}
+            style={styles.primaryBtn}
           >
-            {busy ? (
-              <View style={styles.signInBusyRow}>
-                <ActivityIndicator color={COLORS.BG_DEEP} size="small" />
-                <Text style={styles.signInText}>Signing in…</Text>
-              </View>
-            ) : (
-              <Text style={styles.signInText}>Sign in with Quran Foundation</Text>
-            )}
-          </Pressable>
+            Continue with Quran Foundation
+          </Button>
         </View>
       </View>
-    </LinearGradient>
+    </HeroDusk>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: 28,
-    paddingTop: 80,
-    paddingBottom: 56,
-  },
-  accentBlob: {
-    position: 'absolute',
-    top: -60,
-    right: -80,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: 'rgba(20,184,166,0.07)',
-  },
+  container: { flex: 1 },
   content: {
     flex: 1,
+    paddingHorizontal: 28,
+    paddingTop: 88,
+    paddingBottom: 56,
     justifyContent: 'space-between',
+    zIndex: 2,
   },
   logoArea: {
-    gap: 8,
+    gap: spacing[3],
+    alignItems: 'flex-start',
   },
   appName: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -1.5,
-  },
-  tagline: {
-    fontSize: 15,
-    color: COLORS.ACCENT,
-    fontWeight: '500',
-    letterSpacing: 0.2,
+    fontFamily: fontFamily.displayMedium,
+    fontSize: 38,
+    lineHeight: 42,
+    letterSpacing: -0.76,
+    marginTop: spacing[2],
   },
   cta: {
-    gap: 16,
+    gap: spacing[3],
   },
   heading: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -0.5,
+    fontFamily: fontFamily.displayMedium,
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: -0.56,
   },
   subheading: {
-    fontSize: 15,
-    color: COLORS.TEXT_SECONDARY,
-    lineHeight: 22,
-  },
-  signInBtn: {
-    backgroundColor: COLORS.ACCENT,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  signInBtnPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
-  signInBtnDisabled: {
-    opacity: 0.7,
-  },
-  signInBusyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  signInText: {
+    fontFamily: fontFamily.display,
     fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.BG_DEEP,
-    letterSpacing: 0.1,
+    lineHeight: 24,
+    marginBottom: spacing[2],
+  },
+  primaryBtn: {
+    marginTop: spacing[2],
   },
 });

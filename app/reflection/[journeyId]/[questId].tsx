@@ -5,28 +5,30 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { COLORS } from '@/lib/constants';
+import { ArchesPattern, OrnamentStar } from '@/components/brand';
+import { Button, Eyebrow, Text } from '@/components/ui';
+import { fontFamily, palette, radii, spacing, useColors } from '@/lib/theme';
 import { useJourneyDetail } from '@/features/journeys/useJourneyDetail';
 
 const REFLECTION_STORAGE_PREFIX = 'versetale_reflection_';
 
 /**
- * Reflection screen — shown after completing a quest.
- * Displays the quest's completionPrompt and collects the user's written reflection.
- * Persists the note to AsyncStorage (Phase 3 will sync to the user API).
+ * Reflection — dark-mode writing surface that follows quest completion.
+ * The completion prompt is set in Fraunces over a dusk-tinted card with
+ * the arches pattern and an ornament; the writing surface itself uses
+ * Fraunces 17 for the literary feel called out in the design brief.
  */
 export default function ReflectionScreen() {
   const { journeyId, questId } = useLocalSearchParams<{ journeyId: string; questId: string }>();
   const { data: journey } = useJourneyDetail(journeyId);
+  const { colors } = useColors();
 
   const quest = journey?.quests.find((q) => q.id === questId);
 
@@ -35,7 +37,7 @@ export default function ReflectionScreen() {
 
   const handleSave = useCallback(async () => {
     if (!note.trim()) {
-      Alert.alert('Empty Reflection', 'Write something before saving.');
+      Alert.alert('A blank page', 'Write something — even a single line — before saving.');
       return;
     }
 
@@ -53,7 +55,7 @@ export default function ReflectionScreen() {
       );
       router.replace(`/(tabs)/journey/${journeyId}`);
     } catch {
-      Alert.alert('Error', 'Could not save your reflection. Please try again.');
+      Alert.alert('Couldn\'t save', 'We weren\'t able to save your reflection. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -63,80 +65,88 @@ export default function ReflectionScreen() {
     router.replace(`/(tabs)/journey/${journeyId}`);
   }, [journeyId]);
 
+  const wordCount = note.trim() ? note.trim().split(/\s+/).length : 0;
+
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.bg }]}
+      edges={['top', 'bottom']}
+    >
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
+        <View style={styles.topBar}>
+          <Button variant="ghost" size="sm" onPress={handleSkip}>
+            Cancel
+          </Button>
+          <Eyebrow tone="subtle">Reflection · Day {quest?.day ?? '—'}</Eyebrow>
+          <Button variant="ghost" size="sm" onPress={handleSave} loading={isSaving}>
+            Save
+          </Button>
+        </View>
+
         <ScrollView
           style={styles.flex}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.completedPill}>
-              <Text style={styles.completedPillText}>Quest Complete</Text>
-            </View>
-            <Text style={styles.dayLabel}>
-              Day {quest?.day ?? '—'} — {quest?.title ?? ''}
-            </Text>
-          </View>
-
-          {/* Reflection prompt card */}
-          <View style={styles.promptCard}>
-            <Text style={styles.promptLabel}>Reflect</Text>
-            <Text style={styles.promptText}>{quest?.completionPrompt ?? ''}</Text>
-          </View>
-
-          {/* Narrative excerpt (smaller, for context) */}
+          {/* Verse echo card */}
           {quest?.reflection ? (
-            <View style={styles.narrativeCard}>
-              <View style={styles.narrativeBorder} />
-              <Text style={styles.narrativeText}>{quest.reflection}</Text>
+            <View
+              style={[
+                styles.echoCard,
+                {
+                  backgroundColor: colors.brandSoft,
+                  borderColor: 'rgba(62,154,162,0.18)',
+                },
+              ]}
+            >
+              <Eyebrow tone="brand" style={styles.echoEyebrow}>
+                You are reflecting on
+              </Eyebrow>
+              <Text variant="read" style={styles.echoText} tone="default">
+                {quest.reflection}
+              </Text>
             </View>
           ) : null}
 
-          {/* Text area */}
-          <View style={styles.inputCard}>
-            <Text style={styles.inputLabel}>Your reflection</Text>
-            <TextInput
-              style={styles.textInput}
-              value={note}
-              onChangeText={setNote}
-              placeholder="Write your thoughts here…"
-              placeholderTextColor={COLORS.TEXT_TERTIARY}
-              multiline
-              textAlignVertical="top"
-              returnKeyType="default"
-              maxLength={1000}
-              accessibilityLabel="Reflection text input"
-            />
-            <Text style={styles.charCount}>{note.length}/1000</Text>
+          {/* Prompt — Fraunces 22 */}
+          <View style={styles.promptWrap}>
+            <View style={styles.promptOrnament}>
+              <OrnamentStar size={22} color={palette.amber[300]} />
+            </View>
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+              <ArchesPattern color={colors.fg} opacity={0.04} tileSize={140} />
+            </View>
+            <Text style={[styles.promptText, { color: colors.fg }]}>
+              {quest?.completionPrompt ?? 'A moment to reflect.'}
+            </Text>
           </View>
+
+          {/* Editor */}
+          <TextInput
+            style={[styles.editor, { color: colors.fg }]}
+            value={note}
+            onChangeText={setNote}
+            placeholder="Begin where the verse meets your day…"
+            placeholderTextColor={colors.fgSubtle}
+            multiline
+            textAlignVertical="top"
+            maxLength={2000}
+            accessibilityLabel="Reflection text input"
+          />
         </ScrollView>
 
-        {/* Action buttons */}
-        <View style={styles.actionRow}>
-          <Pressable
-            onPress={handleSkip}
-            style={styles.skipBtn}
-            accessibilityLabel="Skip reflection"
-          >
-            <Text style={styles.skipBtnText}>Skip</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleSave}
-            disabled={isSaving}
-            style={({ pressed }) => [styles.saveBtn, pressed && styles.saveBtnPressed]}
-            accessibilityLabel="Save reflection"
-          >
-            <Text style={styles.saveBtnText}>{isSaving ? 'Saving…' : 'Save Reflection'}</Text>
-          </Pressable>
+        <View style={[styles.toolbar, { backgroundColor: colors.bgRaised, borderColor: colors.border }]}>
+          <Text variant="meta" tone="muted">
+            {wordCount} {wordCount === 1 ? 'word' : 'words'}
+          </Text>
+          <Text variant="mono" tone="subtle">
+            {note.length}/2000
+          </Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -144,154 +154,68 @@ export default function ReflectionScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.BG_DEEP,
-  },
-  flex: {
-    flex: 1,
+  container: { flex: 1 },
+  flex: { flex: 1 },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: spacing[2],
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-    gap: 16,
+    paddingTop: spacing[4],
+    paddingBottom: spacing[6],
+    gap: spacing[5],
   },
-
-  // Header
-  header: {
-    gap: 8,
-    alignItems: 'flex-start',
-  },
-  completedPill: {
-    backgroundColor: 'rgba(20,184,166,0.15)',
+  echoCard: {
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.35)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[4],
+    gap: spacing[2],
   },
-  completedPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.ACCENT,
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
+  echoEyebrow: {
+    marginBottom: 4,
   },
-  dayLabel: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: COLORS.TEXT_PRIMARY,
-    letterSpacing: -0.5,
-  },
-
-  // Prompt card
-  promptCard: {
-    backgroundColor: 'rgba(20,184,166,0.07)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(20,184,166,0.2)',
-    padding: 18,
-    gap: 8,
-  },
-  promptLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.ACCENT,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-  },
-  promptText: {
-    fontSize: 17,
-    color: COLORS.ACCENT,
-    lineHeight: 26,
-    fontWeight: '500',
-  },
-
-  // Narrative
-  narrativeCard: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 4,
-  },
-  narrativeBorder: {
-    width: 2,
-    backgroundColor: COLORS.CARD_BORDER,
-    borderRadius: 1,
-  },
-  narrativeText: {
-    flex: 1,
-    fontSize: 14,
-    color: COLORS.TEXT_SECONDARY,
-    lineHeight: 22,
+  echoText: {
+    fontFamily: fontFamily.display,
+    fontSize: 15,
+    lineHeight: 23,
     fontStyle: 'italic',
   },
-
-  // Input
-  inputCard: {
-    backgroundColor: COLORS.CARD_BG,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.CARD_BORDER,
-    padding: 16,
-    gap: 10,
+  promptWrap: {
+    position: 'relative',
+    overflow: 'hidden',
+    paddingTop: spacing[2],
+    paddingBottom: spacing[2],
   },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.TEXT_SECONDARY,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+  promptOrnament: {
+    marginBottom: spacing[3],
   },
-  textInput: {
-    fontSize: 15,
-    color: COLORS.TEXT_PRIMARY,
-    lineHeight: 24,
-    minHeight: 160,
-    maxHeight: 320,
+  promptText: {
+    fontFamily: fontFamily.displayMedium,
+    fontSize: 22,
+    lineHeight: 30,
+    letterSpacing: -0.22,
   },
-  charCount: {
-    fontSize: 11,
-    color: COLORS.TEXT_TERTIARY,
-    textAlign: 'right',
+  editor: {
+    fontFamily: fontFamily.display,
+    fontSize: 17,
+    lineHeight: 29,
+    minHeight: 220,
+    paddingTop: 0,
+    paddingBottom: spacing[6],
   },
-
-  // Actions
-  actionRow: {
+  toolbar: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.CARD_BORDER,
-  },
-  skipBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skipBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.TEXT_SECONDARY,
-  },
-  saveBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: COLORS.ACCENT,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveBtnPressed: {
-    opacity: 0.85,
-  },
-  saveBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0A0F1E',
+    margin: spacing[3],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    borderRadius: radii.lg,
+    borderWidth: 1,
   },
 });

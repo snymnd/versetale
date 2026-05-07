@@ -1,6 +1,6 @@
-import { Text, TextProps, StyleSheet } from 'react-native';
+import { StyleSheet, Text, type TextProps } from 'react-native';
 
-import { COLORS } from '@/lib/constants';
+import { useColors } from '@/lib/theme';
 
 interface ArabicTextProps extends TextProps {
   children: string;
@@ -19,11 +19,12 @@ const SIZE_MAP = {
  * Always RTL writing direction.
  */
 export function ArabicText({ children, size = 'md', style, ...props }: ArabicTextProps) {
+  const { colors } = useColors();
   return (
     <Text
       style={[
         styles.base,
-        { fontSize: SIZE_MAP[size] },
+        { fontSize: SIZE_MAP[size], color: colors.fg },
         style,
       ]}
       {...props}
@@ -36,7 +37,6 @@ export function ArabicText({ children, size = 'md', style, ...props }: ArabicTex
 const styles = StyleSheet.create({
   base: {
     fontFamily: 'AmiriQuran',
-    color: COLORS.TEXT_PRIMARY,
     writingDirection: 'rtl',
     textAlign: 'right',
     lineHeight: 40,

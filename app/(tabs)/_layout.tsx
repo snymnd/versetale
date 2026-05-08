@@ -106,7 +106,13 @@ export default function TabsLayout() {
       />
       {/* Hide nested detail screens from the tab bar */}
       <Tabs.Screen name="journey/[journeyId]" options={{ href: null }} />
-      <Tabs.Screen name="reader/[journeyId]/[questId]" options={{ href: null }} />
+      {/* Reader is a focus surface — the floating tab pill would cover the
+          MiniAudioPlayer (both are position: absolute at the bottom), so hide
+          the tab bar entirely while reading. */}
+      <Tabs.Screen
+        name="reader/[journeyId]/[questId]"
+        options={{ href: null, tabBarStyle: { display: 'none' } }}
+      />
       <Tabs.Screen
         name="profile"
         options={{

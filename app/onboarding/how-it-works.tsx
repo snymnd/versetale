@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Eyebrow, Text } from '@/components/ui';
-import { fontFamily, palette, spacing, useColors } from '@/lib/theme';
+import { fontFamily, spacing, useColors } from '@/lib/theme';
 
 const STEPS = [
   {
@@ -130,7 +130,6 @@ const styles = StyleSheet.create({
     fontSize: 36,
     lineHeight: 40,
     letterSpacing: -0.72,
-    color: palette.ink[25],
   },
   subtitle: {
     fontSize: 15,
@@ -177,7 +176,6 @@ const styles = StyleSheet.create({
     fontSize: 19,
     lineHeight: 24,
     letterSpacing: -0.38,
-    color: palette.ink[25],
   },
   stepBody: {
     fontSize: 15,

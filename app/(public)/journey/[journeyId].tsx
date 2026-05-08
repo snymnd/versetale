@@ -138,7 +138,7 @@ function QuestRow({ quest, totalQuests, onPress }: QuestRowProps) {
         shadow.sm,
         {
           backgroundColor: colors.bgRaised,
-          transform: pressed ? [{ scale: 0.98 }] : undefined,
+          transform: pressed ? [{ scale: 0.98 }] : [],
         },
       ]}
     >

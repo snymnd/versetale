@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Eyebrow, Text } from '@/components/ui';
-import { fontFamily, palette, spacing, useColors } from '@/lib/theme';
+import { fontFamily, spacing, useColors } from '@/lib/theme';
 
 const STEPS = [
   {
@@ -58,7 +58,7 @@ export default function HowItWorksScreen() {
       </View>
 
       <View style={styles.titleGroup}>
-        <Text style={styles.title}>How it works</Text>
+        <Text style={[styles.title, { color: colors.fg }]}>How it works</Text>
         <Text variant="read" tone="muted" style={styles.subtitle}>
           Simple by design. Meaningful by nature.
         </Text>
@@ -81,7 +81,7 @@ export default function HowItWorksScreen() {
               ) : null}
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>{step.title}</Text>
+              <Text style={[styles.stepTitle, { color: colors.fg }]}>{step.title}</Text>
               <Text variant="read" tone="muted" style={styles.stepBody}>
                 {step.body}
               </Text>
@@ -130,7 +130,6 @@ const styles = StyleSheet.create({
     fontSize: 36,
     lineHeight: 40,
     letterSpacing: -0.72,
-    color: palette.ink[25],
   },
   subtitle: {
     fontSize: 15,
@@ -177,7 +176,6 @@ const styles = StyleSheet.create({
     fontSize: 19,
     lineHeight: 24,
     letterSpacing: -0.38,
-    color: palette.ink[25],
   },
   stepBody: {
     fontSize: 15,

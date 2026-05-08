@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { JourneyCard } from '@/components/ui/JourneyCard';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { Text } from '@/components/ui';
-import { fontFamily, palette, spacing, useColors } from '@/lib/theme';
+import { fontFamily, spacing, useColors } from '@/lib/theme';
 import { useAuthStore } from '@/features/auth/authStore';
 import { useJourneys, type JourneySummary } from '@/features/journeys/useJourneys';
 
@@ -63,7 +63,7 @@ export default function PickJourneyScreen() {
       </View>
 
       <View style={styles.titleGroup}>
-        <Text style={styles.title}>Pick your first journey</Text>
+        <Text style={[styles.title, { color: colors.fg }]}>Pick your first journey</Text>
         <Text variant="read" tone="muted" style={styles.subtitle}>
           You can start another one any time.
         </Text>
@@ -115,7 +115,6 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 36,
     letterSpacing: -0.6,
-    color: palette.ink[25],
   },
   subtitle: {
     fontSize: 14,

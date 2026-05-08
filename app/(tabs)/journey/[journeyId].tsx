@@ -214,7 +214,7 @@ function QuestRow({ quest, totalQuests, onPress }: QuestRowProps) {
         {
           backgroundColor: colors.bgRaised,
           opacity: isLocked ? 0.55 : 1,
-          transform: pressed && !isLocked ? [{ scale: 0.98 }] : undefined,
+          transform: pressed && !isLocked ? [{ scale: 0.98 }] : [],
         },
       ]}
     >

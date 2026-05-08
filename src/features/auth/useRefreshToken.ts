@@ -21,13 +21,14 @@ async function _doRefresh(): Promise<string | null> {
     return null;
   }
 
-  const { authBaseUrl, clientId } = getQfOAuthConfig();
+  const { authBaseUrl, clientId, clientSecret } = getQfOAuthConfig();
 
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
     client_id: clientId,
   });
+  if (clientSecret) body.append('client_secret', clientSecret);
 
   const res = await fetch(`${authBaseUrl}/oauth2/token`, {
     method: 'POST',

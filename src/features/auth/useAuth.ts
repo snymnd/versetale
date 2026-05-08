@@ -41,10 +41,12 @@ export function useAuth() {
   );
 
   const login = useCallback(async () => {
-    // Refresh nonce on each attempt to prevent replay attacks across retries.
-    nonceRef.current = Crypto.randomUUID();
-
+    // Read the values that were actually baked into the auth URL when the
+    // request object was built. Mutating nonceRef here would not rebuild the
+    // request (refs do not trigger re-render), so the comparison must use
+    // what the server received and is now echoing back.
     const expectedState = _request?.state;
+    const expectedNonce = _request?.extraParams?.nonce;
 
     const result = await promptAsync();
 
@@ -66,11 +68,16 @@ export function useAuth() {
 
     let tokenResponse: AuthSession.TokenResponse;
     try {
-      // Mobile apps are public OAuth clients — clientSecret must NOT be sent.
-      // Security is provided by PKCE (code_verifier / code_challenge).
+      // QF registers this app as a confidential client — the token endpoint
+      // requires client_secret_post auth in addition to PKCE. Bundling the
+      // secret in a mobile app is not truly secret, but QF's OAuth server
+      // rejects PKCE-only token requests with invalid_client. This matches
+      // the auth method QF support enforces; if they ever switch to
+      // token_endpoint_auth_method=none, the secret can be dropped.
       tokenResponse = await AuthSession.exchangeCodeAsync(
         {
           clientId: config.clientId,
+          clientSecret: config.clientSecret,
           redirectUri: REDIRECT_URI,
           code,
           extraParams: { code_verifier: codeVerifier },
@@ -97,7 +104,7 @@ export function useAuth() {
             nonce?: string;
           };
 
-          if (decoded.nonce && decoded.nonce !== nonceRef.current) {
+          if (decoded.nonce && decoded.nonce !== expectedNonce) {
             if (__DEV__) console.warn('[useAuth] nonce mismatch — possible replay attack');
             return;
           }

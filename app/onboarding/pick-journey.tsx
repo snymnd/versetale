@@ -63,7 +63,7 @@ export default function PickJourneyScreen() {
       </View>
 
       <View style={styles.titleGroup}>
-        <Text style={styles.title}>Pick your first journey</Text>
+        <Text style={[styles.title, { color: colors.fg }]}>Pick your first journey</Text>
         <Text variant="read" tone="muted" style={styles.subtitle}>
           You can start another one any time.
         </Text>

@@ -58,7 +58,7 @@ export default function HowItWorksScreen() {
       </View>
 
       <View style={styles.titleGroup}>
-        <Text style={styles.title}>How it works</Text>
+        <Text style={[styles.title, { color: colors.fg }]}>How it works</Text>
         <Text variant="read" tone="muted" style={styles.subtitle}>
           Simple by design. Meaningful by nature.
         </Text>
@@ -81,7 +81,7 @@ export default function HowItWorksScreen() {
               ) : null}
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>{step.title}</Text>
+              <Text style={[styles.stepTitle, { color: colors.fg }]}>{step.title}</Text>
               <Text variant="read" tone="muted" style={styles.stepBody}>
                 {step.body}
               </Text>

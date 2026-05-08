@@ -109,7 +109,7 @@ export function Button({
           paddingHorizontal: PADDING_X[size],
           backgroundColor: pressed && !isDisabled ? pressFillColor : fillColor,
           opacity: isDisabled ? 0.4 : 1,
-          transform: pressed && !isDisabled ? [{ scale: 0.98 }] : undefined,
+          transform: pressed && !isDisabled ? [{ scale: 0.98 }] : [],
           alignSelf: fullWidth ? 'stretch' : 'flex-start',
         },
         style,
